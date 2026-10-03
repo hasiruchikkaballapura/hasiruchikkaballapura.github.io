@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Bills Submission</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --leaf: #1F4D3A; --leaf-soft: #E4EDE6; --paper: #FAFBF7; --ink: #1A221E;
+    --muted: #5B6760; --line: #CFD8D1; --error: #B42318;
+    --vendor: #1F4D3A; --cash: #9A5B00; --indent: #25607E;
+    --accent: var(--leaf);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 17px/1.5 "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 520px; margin: 0 auto; padding: 28px 18px 48px; }
+  h1 { font-size: 28px; line-height: 1.2; margin: 0 0 6px; }
+  h2 { font-size: 22px; margin: 0; }
+  p.lead { color: var(--muted); margin: 0 0 24px; }
+  .hidden { display: none !important; }
+  .trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+  /* Lock screen */
+  .pin { font-size: 30px; letter-spacing: 14px; text-align: center; font-weight: 700;
+    max-width: 220px; display: block; margin: 0 auto; }
+  .lock-box { max-width: 320px; margin: 0 auto; text-align: center; }
+  .lock-box .err-msg { text-align: center; }
+
+  /* Screen 1 */
+  .types { display: grid; gap: 12px; }
+  .q { font-weight: 700; margin: 24px 0 10px; }
+  .type { display: block; width: 100%; text-align: left; cursor: pointer; background: #fff;
+    border: 2px solid var(--line); border-left: 8px solid var(--c); border-radius: 10px;
+    padding: 18px; font: inherit; color: var(--ink); }
+  .type strong { display: block; font-size: 21px; color: var(--c); }
+  .type span { color: var(--muted); font-size: 15px; }
+  .type:active { background: var(--leaf-soft); }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 3px solid #F0B429; outline-offset: 2px; }
+  .corner { display: flex; justify-content: flex-end; margin-top: 16px; }
+
+  /* Form */
+  .form-head { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding-bottom: 14px; margin-bottom: 20px; border-bottom: 3px solid var(--accent); }
+  .form-head h2 { color: var(--accent); }
+  .who { color: var(--muted); font-size: 15px; margin: -12px 0 18px; word-break: break-all; }
+  .link { background: none; border: 0; color: var(--muted); font: inherit; font-size: 15px;
+    text-decoration: underline; cursor: pointer; padding: 6px 0; }
+  .field { margin-bottom: 18px; }
+  label, .qlabel { display: block; font-weight: 700; margin-bottom: 6px; }
+  .opt { font-weight: 400; color: var(--muted); }
+  .hint { color: var(--muted); font-size: 15px; margin: -2px 0 8px; }
+  .example { font-size: 15px; color: var(--muted); margin: -2px 0 8px; padding: 8px 10px;
+    background: var(--leaf-soft); border-radius: 8px; }
+  .example .tag { display: block; font-size: 12px; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--accent); }
+  .example i { display: block; }
+  input, select, textarea { width: 100%; font: inherit; color: var(--ink); background: #fff;
+    border: 1.5px solid var(--line); border-radius: 8px; padding: 12px; }
+  textarea { min-height: 88px; resize: vertical; }
+  input[readonly] { background: var(--leaf-soft); border-color: transparent; }
+  .sub { margin: 8px 0 0 14px; padding-left: 14px; border-left: 3px solid var(--line); }
+  .err-msg { color: var(--error); font-size: 15px; margin-top: 5px; }
+  .invalid { border-color: var(--error) !important; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .seg button { font: inherit; border: 1.5px solid var(--line); background: #fff; color: var(--ink);
+    border-radius: 8px; padding: 12px 8px; cursor: pointer; }
+  .seg button.on { border-color: var(--accent); background: var(--leaf-soft); font-weight: 700; }
+  .section { font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: .04em;
+    text-transform: uppercase; margin: 24px 0 10px; }
+  .card { border: 1.5px solid var(--line); border-radius: 12px; padding: 16px 14px 6px;
+    margin-bottom: 14px; background: #fff; }
+  .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .card-top strong { font-size: 17px; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  .chip { display: inline-block; margin-top: 8px; font: inherit; font-size: 15px; cursor: pointer;
+    border: 1.5px dashed var(--accent); color: var(--accent); background: transparent;
+    border-radius: 18px; padding: 5px 12px; text-align: left; }
+  .ghost { width: 100%; font: inherit; font-weight: 700; cursor: pointer; padding: 12px;
+    background: #fff; color: var(--accent); border: 1.5px solid var(--accent); border-radius: 8px; }
+  .ghost:active { background: var(--leaf-soft); }
+  .photo-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .preview { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
+  .preview img { width: 84px; height: 84px; object-fit: cover; border-radius: 8px; border: 1.5px solid var(--line); }
+  .primary { width: 100%; font: inherit; font-weight: 700; font-size: 18px; cursor: pointer;
+    background: var(--accent); color: #fff; border: 0; border-radius: 10px; padding: 15px; }
+  .primary:disabled { opacity: .6; cursor: wait; }
+  .banner { background: #FDECEA; color: var(--error); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; }
+  .warn { background: #FFF6E5; border-left: 5px solid var(--cash); padding: 12px 14px;
+    border-radius: 6px; margin: 0 0 16px; }
+  .twobtn { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .twobtn .primary { padding: 12px; font-size: 17px; }
+
+  /* Review, thank you, my bills */
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0;
+    border-bottom: 1px solid var(--line); font-size: 16px; }
+  .row span:last-child { text-align: right; white-space: nowrap; }
+  .note { background: #FFF6E5; border-left: 5px solid var(--cash); padding: 14px 16px;
+    border-radius: 6px; margin: 18px 0; }
+  .billbox { border: 1.5px solid var(--line); border-radius: 10px; padding: 10px 12px;
+    margin-bottom: 8px; font-size: 15px; background: #fff; }
+  .billbox b { color: var(--leaf); }
+  .loading { color: var(--muted); font-size: 15px; padding: 10px 0; }
+  @media (prefers-reduced-motion: no-preference) {
+    .screen { animation: in .18s ease-out; }
+    @keyframes in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- Lock screen (first visit on a phone) -->
+  <section id="s-lock" class="screen hidden">
+    <h1>Bills Submission</h1>
+    <p class="lead">Enter the 4-digit team access code. You only need to do this once on this phone.</p>
+    <div class="lock-box">
+      <div class="field">
+        <input id="pin" class="pin" type="password" inputmode="numeric" pattern="[0-9]*"
+               maxlength="4" autocomplete="off" placeholder="••••" aria-label="Access code"
+               onkeydown="if (event.key === 'Enter') unlock()">
+      </div>
+      <button id="unlockBtn" class="primary" type="button" onclick="unlock()">Continue</button>
+    </div>
+  </section>
+
+  <!-- Screen 1: email + bill type -->
+  <section id="s-type" class="screen hidden">
+    <h1>Submit a bill</h1>
+    <p class="lead">Enter your email, then choose the bill type.</p>
+    <div class="field">
+      <label for="email">Your email</label>
+      <input id="email" maxlength="200" type="email" inputmode="email" autocomplete="email"
+             autocapitalize="off" placeholder="name@gmail.com">
+    </div>
+    <p class="q">What kind of bill is this?</p>
+    <div class="types">
+      <button class="type" style="--c: var(--vendor)" onclick="pickType('Vendor')">
+        <strong>Vendor</strong><span>Bill raised by a vendor or supplier</span></button>
+      <button class="type" style="--c: var(--cash)" onclick="pickType('Cash')">
+        <strong>Cash</strong><span>Paid in cash, from an advance or personally</span></button>
+      <button class="type" style="--c: var(--indent)" onclick="pickType('Indent')">
+        <strong>Indent</strong><span>Bill against an indent</span></button>
+    </div>
+    <div class="corner"><button class="link" type="button" onclick="showToday('todayFront')">My bills today</button></div>
+    <div id="todayFront"></div>
+  </section>
+
+  <!-- Screen 2: form -->
+  <section id="s-form" class="screen hidden">
+    <div class="form-head">
+      <h2 id="form-title">Vendor bill</h2>
+      <button class="link" type="button" onclick="show('s-type')">Change type</button>
+    </div>
+    <p class="who">Submitting as <strong id="whoEmail"></strong></p>
+
+    <div id="banner" class="banner hidden"></div>
+
+    <div class="field">
+      <label for="subDate">Submission date</label>
+      <input id="subDate" readonly>
+    </div>
+
+    <div class="field">
+      <label for="project">Project name</label>
+      <select id="project" onchange="$('otherWrap').classList.toggle('hidden', this.value !== 'Other')">
+        <option value="">Select a project</option>
+        <option>Watershed Development Project</option>
+        <option>Roadside Plantation</option>
+        <option>Community Plantation</option>
+        <option>Regenerative Agriculture</option>
+        <option>Hasiru Shaale</option>
+        <option>Other</option>
+      </select>
+      <div id="otherWrap" class="sub hidden">
+        <label for="otherProject">Type the project name</label>
+        <input id="otherProject" maxlength="200" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field">
+      <p class="qlabel">How many bills under this project?</p>
+      <div class="seg" id="qCount">
+        <button type="button" data-v="one">One bill</button>
+        <button type="button" data-v="multi">Multiple bills</button>
+      </div>
+    </div>
+
+    <div class="field hidden" id="qVendorWrap">
+      <p class="qlabel">Are they all from the same vendor?</p>
+      <div class="seg" id="qVendor">
+        <button type="button" data-v="same">Same vendor</button>
+        <button type="button" data-v="diff">Different vendors</button>
+      </div>
+    </div>
+
+    <div id="warnBox" class="warn hidden"></div>
+
+    <div id="details" class="hidden">
+      <div class="field" id="sharedVendorWrap">
+        <label for="vendor">Vendor Name</label>
+        <input id="vendor" maxlength="200">
+      </div>
+      <div class="field">
+        <label for="submittedBy">Submitted by</label>
+        <input id="submittedBy" maxlength="200" autocomplete="name">
+      </div>
+
+      <p class="section" id="cardsTitle">Bill details</p>
+      <div id="cards"></div>
+      <button class="ghost hidden" id="addBtn" type="button" onclick="addCard()">+ Add another bill from this vendor</button>
+      <div id="addErr"></div>
+
+      <div class="trap" aria-hidden="true">
+        <label for="website">Leave this empty</label>
+        <input id="website" tabindex="-1" autocomplete="off">
+      </div>
+
+      <div style="margin-top: 18px">
+        <button id="submitBtn" class="primary" type="button" onclick="toReview()">Submit bill</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Screen 3: review -->
+  <section id="s-review" class="screen hidden">
+    <h1>Check before saving</h1>
+    <div id="reviewBody"></div>
+    <div id="reviewErr" class="banner hidden"></div>
+    <div class="twobtn">
+      <button class="ghost" type="button" onclick="show('s-form')">Go back</button>
+      <button class="primary" id="confirmBtn" type="button" onclick="confirmSave()">Confirm and save</button>
+    </div>
+  </section>
+
+  <!-- Screen 4: thank you -->
+  <section id="s-done" class="screen hidden">
+    <h1 id="doneTitle">Thank you, your bill is submitted</h1>
+    <div id="doneList"></div>
+    <div id="personalNote" class="note hidden">
+      Since you paid for this personally, your reimbursement will be made within
+      2 working days after this bill is submitted to the accounts team. Thank you for your patience.
+    </div>
+    <button class="primary" type="button" onclick="another()" style="margin-top: 18px">Submit another bill</button>
+    <div class="corner"><button class="link" type="button" onclick="showToday('todayDone')">My bills today</button></div>
+    <div id="todayDone"></div>
+  </section>
+
+</main>
+
+<!-- One bill card (copied for each bill) -->
+<template id="cardTpl">
+  <div class="card">
+    <div class="card-top"><strong class="ttl"></strong><button class="link rm" type="button">Remove</button></div>
+    <div class="field vWrap">
+      <label>Vendor Name</label>
+      <input class="f-vendor" maxlength="200">
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Bill number</label><input class="f-bn" maxlength="200" autocomplete="off"></div>
+      <div class="field"><label>Bill amount (₹)</label><input class="f-am" type="number" inputmode="decimal" min="0.01" step="0.01"></div>
+    </div>
+    <div class="field"><label>Bill date</label><input class="f-bd" type="date"></div>
+
+    <div class="cashOnly">
+      <div class="field">
+        <label>Payment mode</label>
+        <div class="seg f-pm">
+          <button type="button" data-v="Advance">Advance</button>
+          <button type="button" data-v="Personal">Personal</button>
+        </div>
+        <div class="sub advWrap hidden">
+          <label>Advance Sent By</label>
+          <p class="hint">Who sent you the advance from the department account</p>
+          <input class="f-adv" data-sugg="adv" maxlength="200">
+          <div class="sugg"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Cash paid by</label>
+        <p class="hint">Who paid the shop or vendor</p>
+        <input class="f-cpb" data-sugg="cpb" maxlength="200">
+        <div class="sugg"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Expense description</label>
+      <div class="example"><span class="tag">Example</span><i>Expenses towards Food/Fuel for Veh No. 123 by Vol ABC under XYZ Project</i></div>
+      <textarea class="f-ds" maxlength="2000"></textarea>
+    </div>
+    <div class="field">
+      <label>Other remarks <span class="opt">(optional)</span></label>
+      <textarea class="f-rk" maxlength="2000"></textarea>
+    </div>
+    <div class="field">
+      <label>Bill photo <span class="opt">(optional)</span></label>
+      <p class="hint">Wax or thermal paper bill that may fade? Upload a clear photo.</p>
+      <div class="photo-btns f-photo">
+        <button type="button" class="ghost cam">Take photo</button>
+        <button type="button" class="ghost gal">From gallery</button>
+      </div>
+      <input class="in-cam hidden" type="file" accept="image/*" capture="environment">
+      <input class="in-gal hidden" type="file" accept="image/*">
+      <div class="preview hidden">
+        <img alt="Selected bill photo">
+        <button type="button" class="link rmPhoto">Remove photo</button>
+      </div>
+    </div>
+    <div class="cardErr"></div>
+  </div>
+</template>
+
+<script>
+  /* ===== Backend link: the Apps Script /exec URL ===== */
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzVjC4rYNjtbEE90Gv5yArSLaASauQfQYnhtAriY7AnGynTra8hEFyVtg5YY9YTZawd/exec';
+  /* =================================================== */
+
+  const TYPE_COLOR = { Vendor: 'var(--vendor)', Cash: 'var(--cash)', Indent: 'var(--indent)' };
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  const MAX_BILLS = 10, MIN_DESC = 20;
+  let billType = '', count = '', vendorMode = '';
+  let submissionId = '', resumeForm = false, pending = null;
+
+  const $ = id => document.getElementById(id);
+  const val = id => $(id).value.trim();
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const money = n => '₹' + Number(n).toLocaleString('en-IN', { maximumFractionDigits: 2 });
+
+  function store(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function recall(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function forget(k) { try { localStorage.removeItem(k); } catch (e) {} }
+
+  function todayISO() {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  /* ---------- backend ---------- */
+  async function api(method, payload) {
+    const isGet = method === 'GET';
+    const url = isGet ? SCRIPT_URL + '?' + new URLSearchParams(payload) : SCRIPT_URL;
+    let res;
+    try {
+      res = await fetch(url, {
+        method: method,
+        body: isGet ? undefined : JSON.stringify(payload), // plain text: no preflight
+        redirect: 'follow',
+        credentials: 'omit'
+      });
+    } catch (e) {
+      throw new Error('Could not reach the server. Check your internet and try again.');
+    }
+    let json;
+    try { json = await res.json(); }
+    catch (e) { throw new Error('The server did not respond properly. Please try again.'); }
+    if (!json.ok) {
+      const err = new Error(json.error || 'Request failed.');
+      err.code = json.code;
+      throw err;
+    }
+    return json.data;
+  }
+
+  function newId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  }
+
+  /* ---------- screens and errors ---------- */
+  function show(id) {
+    ['s-lock', 's-type', 's-form', 's-review', 's-done'].forEach(s => $(s).classList.toggle('hidden', s !== id));
+    window.scrollTo(0, 0);
+  }
+
+  function clearErrors() {
+    document.querySelectorAll('.err-msg').forEach(e => e.remove());
+    document.querySelectorAll('.invalid').forEach(e => e.classList.remove('invalid'));
+    $('banner').classList.add('hidden');
+  }
+
+  function flagEl(el, msg) {
+    el.classList.add('invalid');
+    if (msg) {
+      const m = document.createElement('div');
+      m.className = 'err-msg';
+      m.textContent = msg;
+      el.insertAdjacentElement('afterend', m);
+    }
+  }
+  const flag = (id, msg) => flagEl($(id), msg);
+
+  /* ---------- lock screen ---------- */
+  async function unlock() {
+    clearErrors();
+    const code = val('pin');
+    if (!/^\d{4}$/.test(code)) { flag('pin', 'Enter the 4-digit code.'); return; }
+    const btn = $('unlockBtn');
+    btn.disabled = true; btn.textContent = 'Checking…';
+    try {
+      const res = await api('POST', { action: 'unlock', code: code });
+      store('bill_token', res.token);
+      $('pin').value = '';
+      show(resumeForm ? 's-form' : 's-type');
+      resumeForm = false;
+    } catch (err) {
+      flag('pin', err.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Continue';
+    }
+  }
+
+  function relock(message) {
+    forget('bill_token');
+    resumeForm = true;
+    show('s-lock');
+    if (message) flag('pin', message);
+  }
+
+  /* ---------- screen 1 ---------- */
+  function pickType(t) {
+    clearErrors();
+    const em = val('email').toLowerCase();
+    if (!EMAIL_RE.test(em)) {
+      flag('email', 'Enter a valid email, like name@gmail.com, before choosing the bill type.');
+      $('email').focus();
+      return;
+    }
+    $('email').value = em;
+    $('whoEmail').textContent = em;
+    billType = t;
+    document.documentElement.style.setProperty('--accent', TYPE_COLOR[t]);
+    $('form-title').textContent = t + ' bill';
+    $('subDate').value = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    if (!val('submittedBy')) $('submittedBy').value = recall('bill_name');
+    document.querySelectorAll('.card').forEach(applyCardMode);
+    show('s-form');
+  }
+
+  /* ---------- questionnaire ---------- */
+  function setSeg(groupId, v) {
+    document.querySelectorAll('#' + groupId + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  }
+
+  document.querySelectorAll('#qCount button').forEach(b => b.onclick = () => {
+    const v = b.dataset.v;
+    const n = $('cards').children.length;
+    if (v === 'one' && n > 1) {
+      $('warnBox').innerHTML = 'You have ' + n + ' bills filled. Switching to One bill keeps only Bill 1.' +
+        '<div class="twobtn"><button class="ghost" type="button" id="keepMulti">Keep multiple</button>' +
+        '<button class="primary" type="button" id="goOne">Keep only Bill 1</button></div>';
+      $('warnBox').classList.remove('hidden');
+      $('keepMulti').onclick = () => $('warnBox').classList.add('hidden');
+      $('goOne').onclick = () => {
+        [...$('cards').children].slice(1).forEach(c => c.remove());
+        $('warnBox').classList.add('hidden');
+        setCount('one');
+      };
+      return;
+    }
+    setCount(v);
+  });
+
+  function setCount(v) {
+    count = v;
+    setSeg('qCount', v);
+    $('qVendorWrap').classList.toggle('hidden', v !== 'multi');
+    if (v === 'one') vendorMode = 'same';
+    else vendorMode = document.querySelector('#qVendor .on') ? document.querySelector('#qVendor .on').dataset.v : '';
+    layout();
+  }
+
+  document.querySelectorAll('#qVendor button').forEach(b => b.onclick = () => {
+    vendorMode = b.dataset.v;
+    setSeg('qVendor', vendorMode);
+    layout();
+  });
+
+  function layout() {
+    const ready = count === 'one' || (count === 'multi' && vendorMode);
+    $('details').classList.toggle('hidden', !ready);
+    if (!ready) return;
+    if (!$('cards').children.length) addCard();
+    $('sharedVendorWrap').classList.toggle('hidden', vendorMode === 'diff');
+    $('addBtn').classList.toggle('hidden', count !== 'multi');
+    $('addBtn').textContent = vendorMode === 'diff' ? '+ Add another bill' : '+ Add another bill from this vendor';
+    $('cardsTitle').textContent = count === 'multi' ? 'Bill cards · one card per bill' : 'Bill details';
+    $('submitBtn').textContent = count === 'multi' ? 'Submit bills' : 'Submit bill';
+    document.querySelectorAll('.card').forEach(applyCardMode);
+    renumber();
+  }
+
+  /* ---------- bill cards ---------- */
+  function addCard() {
+    $('addErr').innerHTML = '';
+    if ($('cards').children.length >= MAX_BILLS) {
+      $('addErr').innerHTML = '<div class="err-msg">Up to ' + MAX_BILLS + ' bills per group. Submit these, then start another.</div>';
+      return;
+    }
+    const c = $('cardTpl').content.firstElementChild.cloneNode(true);
+    c._photo = null;
+    c.querySelector('.f-bd').max = todayISO();
+    c.querySelector('.rm').onclick = () => { c.remove(); renumber(); };
+
+    c.querySelectorAll('.f-pm button').forEach(b => b.onclick = () => {
+      c.dataset.pm = b.dataset.v;
+      c.querySelectorAll('.f-pm button').forEach(x => x.classList.toggle('on', x === b));
+      c.querySelector('.f-pm').classList.remove('invalid');
+      c.querySelector('.advWrap').classList.toggle('hidden', b.dataset.v !== 'Advance');
+      refreshSuggestions();
+    });
+
+    const cam = c.querySelector('.in-cam'), gal = c.querySelector('.in-gal');
+    c.querySelector('.cam').onclick = () => cam.click();
+    c.querySelector('.gal').onclick = () => gal.click();
+    [cam, gal].forEach(inp => inp.onchange = () => {
+      const f = inp.files[0];
+      inp.value = '';
+      if (!f) return;
+      c._photo = f;
+      c.querySelector('.preview img').src = URL.createObjectURL(f);
+      c.querySelector('.preview').classList.remove('hidden');
+    });
+    c.querySelector('.rmPhoto').onclick = () => {
+      c._photo = null;
+      c.querySelector('.preview img').removeAttribute('src');
+      c.querySelector('.preview').classList.add('hidden');
+    };
+
+    c.querySelectorAll('input, textarea').forEach(i => i.addEventListener('input', () => {
+      i.classList.remove('invalid');
+      refreshSuggestions();
+    }));
+
+    $('cards').appendChild(c);
+    applyCardMode(c);
+    renumber();
+  }
+
+  function applyCardMode(c) {
+    c.querySelector('.cashOnly').classList.toggle('hidden', billType !== 'Cash');
+    c.querySelector('.vWrap').classList.toggle('hidden', vendorMode !== 'diff');
+  }
+
+  function renumber() {
+    const cs = [...$('cards').children];
+    cs.forEach((c, i) => {
+      c.querySelector('.ttl').textContent = count === 'multi' ? 'Bill ' + (i + 1) + ' of ' + cs.length : 'Your bill';
+      c.querySelector('.rm').classList.toggle('hidden', cs.length < 2);
+    });
+    refreshSuggestions();
+  }
+
+  /* One-tap "Same as Bill N" for Advance Sent By and Cash paid by. Nothing is copied unless tapped. */
+  function refreshSuggestions() {
+    const cs = [...$('cards').children];
+    cs.forEach((c, i) => {
+      c.querySelectorAll('input[data-sugg]').forEach(inp => {
+        const box = inp.parentElement.querySelector('.sugg');
+        box.innerHTML = '';
+        if (i === 0 || inp.value.trim()) return;
+        for (let j = i - 1; j >= 0; j--) {
+          const prev = cs[j].querySelector('input[data-sugg="' + inp.dataset.sugg + '"]');
+          if (prev && prev.value.trim()) {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'chip';
+            chip.textContent = 'Same as Bill ' + (j + 1) + ': ' + prev.value.trim();
+            chip.onclick = () => { inp.value = prev.value.trim(); inp.classList.remove('invalid'); refreshSuggestions(); };
+            box.appendChild(chip);
+            break;
+          }
+        }
+      });
+    });
+  }
+
+  /* ---------- collect and check ---------- */
+  function collect() {
+    const cards = [...$('cards').children];
+    return {
+      type: billType,
+      project: $('project').value,
+      otherProject: val('otherProject'),
+      count: count,
+      vendorMode: vendorMode,
+      vendor: val('vendor'),
+      submittedBy: val('submittedBy'),
+      email: val('email').toLowerCase(),
+      website: val('website'),
+      bills: cards.map(c => {
+        const g = s => c.querySelector(s).value.trim();
+        return {
+          _el: c,
+          vendor: vendorMode === 'diff' ? g('.f-vendor') : val('vendor'),
+          billNumber: g('.f-bn'),
+          billDate: c.querySelector('.f-bd').value,
+          amount: c.querySelector('.f-am').value,
+          paymentMode: billType === 'Cash' ? (c.dataset.pm || '') : '',
+          advanceSentBy: g('.f-adv'),
+          cashPaidBy: g('.f-cpb'),
+          description: g('.f-ds'),
+          remarks: g('.f-rk')
+        };
+      })
+    };
+  }
+
+  function check(d) {
+    let ok = true;
+    const need = (cond, el, msg) => { if (!cond) { flagEl(el, msg); ok = false; } return cond; };
+
+    need(d.project, $('project'), 'Select a project.');
+    if (d.project === 'Other') need(d.otherProject, $('otherProject'), 'Type the project name.');
+    if (vendorMode !== 'diff') need(d.vendor, $('vendor'), 'Enter the Vendor Name.');
+    need(d.submittedBy, $('submittedBy'), 'Enter your name.');
+
+    const seen = {};
+    d.bills.forEach((b, i) => {
+      const c = b._el, q = s => c.querySelector(s);
+      if (vendorMode === 'diff') need(b.vendor, q('.f-vendor'), 'Enter the Vendor Name.');
+      need(b.billNumber, q('.f-bn'), 'Enter the bill number.');
+      need(Number(b.amount) > 0, q('.f-am'), 'Enter an amount above zero.');
+      if (need(b.billDate, q('.f-bd'), 'Pick the bill date.') && b.billDate > todayISO()) {
+        flagEl(q('.f-bd'), 'Bill date cannot be in the future.'); ok = false;
+      }
+      if (billType === 'Cash') {
+        need(b.paymentMode, q('.f-pm'), 'Choose Advance or Personal.');
+        if (b.paymentMode === 'Advance') need(b.advanceSentBy, q('.f-adv'), 'Enter who sent the advance.');
+        need(b.cashPaidBy, q('.f-cpb'), 'Enter who paid the shop or vendor.');
+      }
+      if (need(b.description, q('.f-ds'), 'Describe the expense.') && b.description.length < MIN_DESC) {
+        flagEl(q('.f-ds'), 'Describe the expense in a little more detail, like the example.'); ok = false;
+      }
+      const key = (b.vendor + '|' + b.billNumber).toLowerCase();
+      if (b.vendor && b.billNumber) {
+        if (seen[key]) { flagEl(q('.f-bn'), 'Same vendor and bill number as Bill ' + seen[key] + '. Please check.'); ok = false; }
+        else seen[key] = i + 1;
+      }
+    });
+    return ok;
+  }
+
+  /* ---------- review ---------- */
+  function toReview() {
+    clearErrors();
+    const d = collect();
+    if (!check(d)) {
+      $('banner').textContent = 'Some details are missing. Check the highlighted fields.';
+      $('banner').classList.remove('hidden');
+      const first = document.querySelector('#s-form .invalid');
+      if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    pending = d;
+    submissionId = newId(); // a retry of Confirm reuses this, so no duplicate rows
+    const proj = d.project === 'Other' ? d.otherProject : d.project;
+    const total = d.bills.reduce((s, b) => s + Number(b.amount), 0);
+    const vendors = [...new Set(d.bills.map(b => b.vendor))];
+    const n = d.bills.length;
+    $('reviewBody').innerHTML =
+      '<p class="lead">' + n + ' ' + esc(billType) + ' bill' + (n > 1 ? 's' : '') + ' under <strong>' + esc(proj) + '</strong>, from ' +
+      (vendors.length === 1 ? '<strong>' + esc(vendors[0]) + '</strong>' : vendors.length + ' vendors') +
+      '. Total <strong>' + money(total) + '</strong>.</p>' +
+      d.bills.map((b, i) => '<div class="row"><span>' + (i + 1) + '. ' + esc(b.vendor) + ' · No. ' + esc(b.billNumber) +
+        (b.paymentMode ? ' · ' + b.paymentMode : '') + (b._el._photo ? ' · photo' : '') + '</span><span>' + money(b.amount) + '</span></div>').join('') +
+      '<p class="hint" style="margin-top: 14px">Is everything correct, including the vendor for each bill?</p>';
+    $('reviewErr').classList.add('hidden');
+    show('s-review');
+  }
+
+  /* ---------- save ---------- */
+  async function confirmSave() {
+    const d = pending;
+    if (!d) return;
+    const btn = $('confirmBtn');
+    btn.disabled = true;
+    const hasPhotos = d.bills.some(b => b._el._photo);
+    btn.textContent = hasPhotos ? 'Uploading…' : 'Saving…';
+    $('reviewErr').classList.add('hidden');
+
+    try {
+      const bills = [];
+      for (let i = 0; i < d.bills.length; i++) {
+        const b = Object.assign({}, d.bills[i]);
+        const file = b._el._photo;
+        delete b._el;
+        try {
+          b.photo = file ? await compressImage(file) : null;
+        } catch (e) {
+          throw new Error('The photo on Bill ' + (i + 1) + ' could not be read. Go back and remove or replace it.');
+        }
+        bills.push(b);
+      }
+      const payload = Object.assign({}, d, { bills: bills });
+
+      const res = await api('POST', {
+        action: 'submit',
+        token: recall('bill_token'),
+        submissionId: submissionId,
+        data: payload
+      });
+
+      saveReceipts(res.bills);
+      store('bill_name', d.submittedBy);
+      store('bill_email', d.email);
+      pending = null;
+
+      const n = res.bills.length;
+      $('doneTitle').textContent = n > 1 ? 'Thank you, your ' + n + ' bills are submitted' : 'Thank you, your bill is submitted';
+      $('doneList').innerHTML = res.bills.map((r, i) =>
+        '<div class="row"><span><strong>' + esc(r.billId) + '</strong></span><span>' +
+        esc(d.bills[i].vendor) + ' · ' + money(d.bills[i].amount) + '</span></div>').join('');
+      $('personalNote').classList.toggle('hidden', !res.personal);
+      $('todayDone').innerHTML = '';
+      show('s-done');
+    } catch (err) {
+      if (err.code === 'AUTH') {
+        relock('Please enter the team access code again. Your bill details are kept.');
+      } else {
+        $('reviewErr').textContent = 'Not saved. ' + err.message +
+          ' If this keeps happening, check "My bills today" before trying again.';
+        $('reviewErr').classList.remove('hidden');
+      }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Confirm and save';
+    }
+  }
+
+  /* Shrinks the photo (max 1600px, JPEG) so it uploads fast on mobile data. */
+  function compressImage(file, maxSide = 1600, quality = 0.75) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(img.width * scale);
+        cv.height = Math.round(img.height * scale);
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        const dataUrl = cv.toDataURL('image/jpeg', quality);
+        URL.revokeObjectURL(img.src);
+        resolve({ name: 'bill.jpg', mimeType: 'image/jpeg', base64: dataUrl.split(',')[1] });
+      };
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  /* ---------- My bills today ---------- */
+  function loadReceipts() {
+    let list = [];
+    try { list = JSON.parse(recall('bill_receipts') || '[]'); } catch (e) {}
+    const today = todayISO();
+    const fresh = list.filter(r => r && r.d === today); // clears itself after midnight
+    if (fresh.length !== list.length) store('bill_receipts', JSON.stringify(fresh));
+    return fresh;
+  }
+
+  function saveReceipts(bills) {
+    const list = loadReceipts();
+    const today = todayISO();
+    bills.forEach(b => {
+      if (!list.some(r => r.billId === b.billId)) list.push({ d: today, billId: b.billId, receipt: b.receipt });
+    });
+    store('bill_receipts', JSON.stringify(list.slice(-60)));
+  }
+
+  async function showToday(target) {
+    const box = $(target);
+    const receipts = loadReceipts().map(r => ({ billId: r.billId, receipt: r.receipt }));
+    if (!receipts.length) {
+      box.innerHTML = '<p class="hint" style="margin-top: 10px">No bills submitted from this phone today.</p>';
+      return;
+    }
+    box.innerHTML = '<p class="loading">Checking…</p>';
+    try {
+      const res = await api('POST', { action: 'mybills', token: recall('bill_token'), receipts: receipts });
+      if (!res.bills.length) {
+        box.innerHTML = '<p class="hint" style="margin-top: 10px">No bills submitted from this phone today.</p>';
+        return;
+      }
+      box.innerHTML = '<p class="section">Bills submitted today from this phone</p>' +
+        res.bills.map(b => '<div class="billbox"><b>' + esc(b.billId) + '</b>' + (b.time ? ' · ' + esc(b.time) : '') +
+          '<br>' + esc(b.vendor) + ' · No. ' + esc(b.billNumber) + ' · ' + money(b.amount) +
+          '<br><span class="opt">' + esc(b.type) + ' · ' + esc(b.project) + '</span></div>').join('') +
+        '<p class="hint">All bills shown here are safely recorded.</p>';
+    } catch (err) {
+      if (err.code === 'AUTH') { box.innerHTML = ''; relock('Please enter the team access code again.'); resumeForm = false; return; }
+      box.innerHTML = '<p class="err-msg">Could not load the list. ' + esc(err.message) + '</p>';
+    }
+  }
+
+  /* ---------- submit another ---------- */
+  function another() {
+    const keepName = val('submittedBy'), keepEmail = val('email');
+    ['project', 'otherProject', 'vendor', 'website'].forEach(id => $(id).value = '');
+    $('otherWrap').classList.add('hidden');
+    $('cards').innerHTML = '';
+    count = ''; vendorMode = '';
+    setSeg('qCount', ''); setSeg('qVendor', '');
+    $('qVendorWrap').classList.add('hidden');
+    $('details').classList.add('hidden');
+    $('warnBox').classList.add('hidden');
+    $('submittedBy').value = keepName;
+    $('email').value = keepEmail;
+    $('todayFront').innerHTML = '';
+    pending = null; submissionId = '';
+    clearErrors();
+    show('s-type');
+  }
+
+  /* ---------- start ---------- */
+  $('email').value = recall('bill_email');
+  loadReceipts();
+  show(recall('bill_token') ? 's-type' : 's-lock');
+  api('GET', { action: 'ping' }).catch(() => {}); // wakes the backend up quietly
+</script>
+</body>
+</html>
