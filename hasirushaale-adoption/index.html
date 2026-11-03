@@ -3,18 +3,18 @@
   =====================================================================
    index.html  |  Hasiru Shaale adoption app: the page
   =====================================================================
-   What this file does : everything people see. It talks to Code.gs.
+   What this file does : everything people see. It talks to Code.gs
+                         through the web app link in section P2.1.
    Where it lives      : GitHub, hasiruchikkaballapura.github.io,
-                         folder hasirushaale-adoption/  (sign-in works here).
-                         The same file also opens from the Apps Script
-                         /exec link (only the connection check works there).
+                         folder hasirushaale-adoption/
+                         (with the A4 form file a4-visit-form.pdf next to it).
    Data                : none is stored in this file. All data stays in
                          the Google Sheet. The sign-in key (Client ID) is
                          fetched from the backend, so it is not typed here.
 
    HOW TO CHANGE ONE PART
    Every section sits between a START line and an END line, e.g.
-      /* ===== START P5.1 My schools ===== */  ...  /* ===== END P5.1 ===== */
+      /* ===== START P9.9 Example ===== */  ...  /* ===== END P9.9 ===== */
    To replace a section: Ctrl+F the START line, select from it down to
    its END line (both included), paste the new section, Commit changes.
 
@@ -23,7 +23,7 @@
     P1    Style
       P1.1  Colours (light and dark)
       P1.2  Page layout
-      P1.3  Cards, chips, buttons, tabs, tables
+      P1.3  Cards, chips, buttons, tabs, tables, forms
     P2    Config
       P2.1  Web app link
     P3    Backend calls and sign-in
@@ -31,16 +31,24 @@
       P3.2  Google sign-in
     P4    Words
       P4.1  Words used on the screens
-    P5    Volunteer
-      P5.1  My schools
-      P5.2  School card
-    P7    Coordinator and admin
+    P5    Volunteer tab
+      P5.1  My schools (list)
+      P5.2  School page
+      P5.3  First thing on arrival: location, front photo, book
+      P5.4  Physical (A4) form: download and upload
+      P5.5  Call log
+      P5.6  Photo and date helpers
+    P7    Coordinator and Admin tabs
       P7.1  Volunteers list
-      P7.2  Admin overview
-      P7.3  Find schools (admin)
+      P7.2  Admin dashboard
+      P7.3  Admin: schools (assignments come in D2)
+      P7.4  Admin: uploaded A4 forms
+      P7.5  Screens coming later
+    P8    Map tab
+      P8.1  Map (comes in D5)
     P10   Start-up
       P10.1 Page body
-      P10.2 Screens, tabs and the phone Back button
+      P10.2 Tabs, screens and the phone Back button
       P10.3 Small helpers
       P10.4 Start
   =====================================================================
@@ -52,7 +60,7 @@
 <title>Hasiru Shaale · School adoption</title>
 
 <!-- ===== START P0.0 Version ===== -->
-<meta name="app-version" content="2026-11-03 v3">
+<meta name="app-version" content="2026-11-03 v5">
 <!-- ===== END P0.0 ===== -->
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -77,23 +85,24 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); }
 body { font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-.top { background: var(--surface); border-bottom: 1px solid var(--line); padding: 12px max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
+.top { background: var(--surface); border-bottom: 1px solid var(--line); padding: 12px max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); position: sticky; top: 0; z-index: 5; }
 .top-in, .main { max-width: 980px; margin: 0 auto; }
 .top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .brand { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
 .title { font-size: 20px; font-weight: 700; line-height: 1.2; }
 .who { font-size: 14px; color: var(--muted); text-align: right; }
-.main { padding: 18px max(16px, env(safe-area-inset-right)) 48px max(16px, env(safe-area-inset-left)); }
-h2 { font-size: 22px; line-height: 1.2; margin: 4px 0 12px; }
+.main { padding: 16px max(16px, env(safe-area-inset-right)) 56px max(16px, env(safe-area-inset-left)); }
+h2 { font-size: 22px; line-height: 1.2; margin: 4px 0 12px; overflow-wrap: anywhere; }
 h3 { font-size: 17px; margin: 0 0 6px; }
 .small { font-size: 14px; color: var(--muted); }
 .stack > * + * { margin-top: 12px; }
 .grid-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 /* ===== END P1.2 ===== */
 
-/* ===== START P1.3 Cards, chips, buttons, tabs, tables ===== */
+/* ===== START P1.3 Cards, chips, buttons, tabs, tables, forms ===== */
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
 .card.caution { border-color: var(--warn); }
+.card.first { border: 2px solid var(--accent); background: var(--accent-soft); }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
 .tile .n { font-size: 26px; font-weight: 700; line-height: 1.1; }
 .tile .l { font-size: 13px; color: var(--muted); }
@@ -105,28 +114,52 @@ h3 { font-size: 17px; margin: 0 0 6px; }
 .btn:hover { border-color: var(--accent); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .btn.sm { font-size: 14px; padding: 5px 10px; }
+.btn[disabled] { opacity: .6; cursor: default; }
 .link { color: var(--link); text-decoration: underline; cursor: pointer; background: none; border: 0; font: inherit; padding: 0; }
 .tabs { display: flex; gap: 4px; overflow-x: auto; margin-top: 10px; }
 .tabs button { font: inherit; font-size: 15px; padding: 8px 12px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.subtabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.subtabs button { font: inherit; font-size: 14px; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; }
+.subtabs button[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px 16px; margin: 10px 0 0; }
 .kv dt { font-size: 12px; color: var(--muted); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
+.kv .wide { grid-column: 1 / -1; }
 .phone { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-select, input[type=search], input[type=text] { font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); max-width: 100%; }
+select, input[type=search], input[type=text], input[type=date], textarea { font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); max-width: 100%; }
+textarea { width: 100%; min-height: 70px; }
+.form { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: 10px 0; }
+.form label, label.f { font-size: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
+.form .wide { grid-column: 1 / -1; }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 15px; color: var(--ink); }
 .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--surface-2); }
 td.n, th.n { text-align: right; }
+tr.click { cursor: pointer; }
+tr.click:hover td { background: var(--surface-2); }
 .msg { padding: 12px 14px; border-radius: 10px; background: var(--surface-2); }
 .msg.bad { background: var(--bad-soft); color: var(--bad); }
 .msg.warn { background: var(--warn-soft); color: var(--warn); }
+.msg.good { background: var(--accent-soft); color: var(--accent); }
 .signin-box { max-width: 460px; margin: 40px auto; text-align: center; }
 .signin-box .card { padding: 28px 22px; }
 #gbtn { display: flex; justify-content: center; margin-top: 18px; min-height: 44px; }
 .sl { color: var(--muted); font-weight: 600; margin-right: 6px; }
+.school-btn { display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.school-btn:hover { border-color: var(--accent); }
+.first-items { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-top: 10px; }
+.first-items .item { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+.first-items .item b { display: block; margin-bottom: 6px; }
+.thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.thumbs img { width: 72px; height: 96px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line); }
+.back { margin-bottom: 10px; }
+.line { border-top: 1px solid var(--line); margin: 12px 0; }
+.list-row { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.list-row:last-child { border-bottom: 0; }
 /* ===== END P1.3 ===== */
 </style>
 </head>
@@ -149,34 +182,24 @@ td.n, th.n { text-align: right; }
 /* ===== START P2.1 Web app link ===== */
 // Paste the web app link (it ends in /exec) between the quotes.
 var CONFIG = {
-  EXEC_URL: 'https://script.google.com/macros/s/AKfycbwiPbvvTZoShDMtUDFjSLNMj7LEsSot4F2M30UUgO7pxoUXj93vypjB04l_991g8oBq/exec'
+  EXEC_URL: 'https://script.google.com/macros/s/AKfycbwiPbvvTZoShDMtUDFjSLNMj7LEsSot4F2M30UUgO7pxoUXj93vypjB04l_991g8oBq/exec',
+  A4_FORM_FILE: 'a4-visit-form.pdf'     // the printable A4 form, kept in the same GitHub folder
 };
 /* ===== END P2.1 ===== */
 
 /* ===== START P3.1 Call Code.gs ===== */
-// Works in two places:
-//  - opened from the Apps Script /exec link: uses google.script.run;
-//  - opened from GitHub: uses the /exec link in P2.1.
-// The sign-in token is added to every request automatically.
-var INSIDE_APPS_SCRIPT = (typeof google !== 'undefined' && google.script && google.script.run);
+// Every request goes to the /exec link in P2.1, with the sign-in token added.
 function apiCall(action, data) {
   var req = Object.assign({ action: action, token: APP.token || '' }, data || {});
-  var p;
-  if (INSIDE_APPS_SCRIPT) {
-    p = new Promise(function (ok, fail) {
-      google.script.run.withSuccessHandler(function (txt) { ok(JSON.parse(txt)); }).withFailureHandler(fail).apiRun(req);
+  return fetch(CONFIG.EXEC_URL, {
+    method: 'POST', redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // plain text, so the browser sends it straight away
+    body: JSON.stringify(req)
+  }).then(function (r) { return r.json(); })
+    .then(function (res) {
+      if (res && res.needSignIn) { signOut(res.error); throw new Error(res.error); }
+      return res;
     });
-  } else {
-    p = fetch(CONFIG.EXEC_URL, {
-      method: 'POST', redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // plain text, so the browser sends it straight away
-      body: JSON.stringify(req)
-    }).then(function (r) { return r.json(); });
-  }
-  return p.then(function (res) {
-    if (res && res.needSignIn) { signOut(res.error); throw new Error(res.error); }
-    return res;
-  });
 }
 /* ===== END P3.1 ===== */
 
@@ -218,7 +241,7 @@ function loadMe() {
   setMain('<div class="signin-box"><div class="card">Signing you in…</div></div>');
   apiCall('me').then(function (res) {
     if (!res.ok) { signOut(res.error); return; }
-    APP.me = res.person; APP.settings = res.settings;
+    APP.me = res.person; APP.settings = res.settings || {};
     document.getElementById('top').hidden = false;
     document.getElementById('who-name').textContent = res.person.name + ' · ' + res.person.role;
     buildTabs();
@@ -229,77 +252,310 @@ function loadMe() {
 
 /* ===== START P4.1 Words used on the screens ===== */
 var WORDS = {
-  tabSchools: 'My schools',
-  tabVolunteers: 'Volunteers',
-  tabOverview: 'Overview',
-  tabFind: 'Schools',
+  tabVolunteer: 'Volunteer', tabCoordinator: 'Coordinator', tabAdmin: 'Admin', tabMap: 'Map',
+  mySchools: 'My schools',
   noSchools: 'No schools are assigned to you yet. Your coordinator will assign them soon.',
   caution: 'Not ready or merged: take care before assigning',
-  notWilling: 'School not willing to support'
+  notWilling: 'School not willing to support',
+  firstTitle: 'First thing on arrival',
+  firstHelp: 'Reminders only. Do them when you are at the school.',
+  locTitle: 'School location',
+  photoTitle: 'School front photo',
+  bookTitle: 'Have you given the Hasiru Shaale book to the school?',
+  formTitle: 'Physical form (A4)',
+  formHelp: 'Download and print the form, fill it at the school, then take a clear photo of each side and upload it here. The office enters it into the app.',
+  formDone: 'Uploaded. Thank you! The office will enter it.',
+  callTitle: 'Call the school',
+  callHelp: 'If the school does not allow your visit, fill the physical (A4) form during this call, from home.',
+  visitOff: 'Record your visit is switched off for now. Please use the physical (A4) form above.'
 };
 /* ===== END P4.1 ===== */
 
-/* ===== START P5.1 My schools ===== */
+/* ===== START P5.1 My schools (list) ===== */
 function screenMySchools() {
-  setMain('<h2>' + WORDS.tabSchools + '</h2><p class="small">Loading your schools…</p>');
+  setMain('<h2>' + WORDS.mySchools + '</h2><p class="small">Loading your schools…</p>');
   apiCall('mySchools').then(function (res) {
     if (!res.ok) { setMain('<div class="msg bad">' + esc(res.error) + '</div>'); return; }
     var list = res.schools || [];
-    var h = '<h2>' + WORDS.tabSchools + '</h2>';
+    var h = '<h2>' + WORDS.mySchools + '</h2>';
     if (!list.length) { setMain(h + '<div class="card">' + WORDS.noSchools + '</div>'); return; }
-    h += '<p class="small">' + list.length + ' school' + (list.length === 1 ? '' : 's') + ' adopted</p><div class="stack">';
-    list.forEach(function (s, i) { h += schoolCard(s, i + 1); });
+    h += '<p class="small">' + list.length + ' school' + (list.length === 1 ? '' : 's') + ' adopted. Tap a school to open it.</p><div class="stack">';
+    list.forEach(function (s, i) {
+      h += '<button type="button" class="card school-btn' + (s.caution ? ' caution' : '') + '" data-open="' + s.id + '">' +
+        '<h3><span class="sl">' + (i + 1) + '.</span>' + esc(s.name) + '</h3>' +
+        '<div class="small">' + esc([s.village, s.gp, s.hobli, s.taluk].filter(String).join(' · ')) + '</div>' +
+        '<div style="margin-top:6px">' + (s.caution ? chip(WORDS.caution, 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') +
+        chip(s.location ? 'Location saved' : 'Location not saved yet', s.location ? 'good' : 'warn') +
+        chip(s.frontPhoto ? 'Front photo saved' : 'Front photo not taken yet', s.frontPhoto ? 'good' : 'warn') + '</div></button>';
+    });
     setMain(h + '</div>');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) {
+      b.addEventListener('click', function () { location.hash = 'vol/school/' + b.dataset.open; });
+    });
   });
 }
 /* ===== END P5.1 ===== */
 
-/* ===== START P5.2 School card ===== */
-// Place from Taluk down to Village, then students; both phone numbers with Call buttons.
-function schoolCard(s, sl) {
-  var given = [];
-  if (s.saplings) given.push(fmtN(s.saplings) + ' saplings');
-  if (s.seeds) given.push(fmtN(s.seeds) + ' seeds');
-  var h = '<div class="card' + (s.caution ? ' caution' : '') + '">';
-  h += '<h3><span class="sl">' + sl + '.</span>' + esc(s.name) + '</h3>';
-  h += '<div>' + (s.caution ? chip(WORDS.caution, 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') +
-       (s.group ? chip('Vol ' + s.groupNo) : '') + chip(s.activity || '-') + '</div>';
-  h += '<dl class="kv">' +
-    kv('Taluk', s.taluk) + kv('Hobli', s.hobli) + kv('Gram panchayat (GP)', s.gp) + kv('Village', s.village) +
-    kv('Students', s.students === null ? '-' : fmtN(s.students)) + kv('UDISE code', s.udise) +
-    kv('Given in Phase 1', given.join(' + ') || '-') + kv('Date of first visit', s.firstVisit) +
-    '<div><dt>Head master or principal</dt><dd>' + esc(s.hmName || '-') + phoneLine(s.hmPhone) + '</dd></div>' +
-    (s.altName || s.altPhone ? '<div><dt>Alternative contact</dt><dd>' + esc(s.altName || '-') + phoneLine(s.altPhone) + '</dd></div>' : '') +
-    '</dl></div>';
+/* ===== START P5.2 School page ===== */
+// One school, opened from My schools (#vol/school/12) or by the admin (#admin/school/12).
+function screenSchool(id, backHash) {
+  setMain('<button class="btn sm back" type="button" id="back">← Back</button><p class="small">Loading the school…</p>');
+  document.getElementById('back').addEventListener('click', function () { location.hash = backHash; });
+  apiCall('school', { schoolId: id }).then(function (res) {
+    if (!res.ok) { setMain('<button class="btn sm back" type="button" id="back">← Back</button><div class="msg bad">' + esc(res.error) + '</div>'); document.getElementById('back').addEventListener('click', function () { location.hash = backHash; }); return; }
+    var s = res.school; APP.school = s;
+    var given = [];
+    if (s.saplings) given.push(fmtN(s.saplings) + ' saplings');
+    if (s.seeds) given.push(fmtN(s.seeds) + ' seeds');
+    var visitOn = APP.me.role === 'Coordinator' ? /^on$/i.test(APP.settings.visitFormCoordinators) : /^on$/i.test(APP.settings.visitFormVolunteers);
+    var h = '<button class="btn sm back" type="button" id="back">← Back</button>';
+    h += '<h2>' + esc(s.name) + '</h2>';
+    h += '<div>' + (s.caution ? chip(WORDS.caution, 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling + (s.first.notWillingReason ? ': ' + s.first.notWillingReason : ''), 'bad') : '') +
+         (s.group ? chip('Vol ' + s.groupNo) : '') + chip(s.activity || '-') + '</div>';
+    h += '<div class="stack" style="margin-top:12px">';
+    h += '<div class="card first" id="firstbox">' + firstBox(s) + '</div>';
+    h += '<div class="card" id="formbox">' + formBox(s) + '</div>';
+    h += '<div class="card" id="callbox">' + callBox(s) + '</div>';
+    h += '<div class="card"><h3>Record your visit</h3><p class="small">' + (visitOn ? 'Comes in D3.' : WORDS.visitOff) + '</p></div>';
+    h += '<div class="card"><h3>School details</h3><dl class="kv">' +
+      kv('Taluk', s.taluk) + kv('Hobli', s.hobli) + kv('Gram panchayat (GP)', s.gp) + kv('Village', s.village) +
+      kv('Students', s.students === null ? '-' : fmtN(s.students)) + kv('UDISE code', s.udise) +
+      kv('Given in Phase 1', given.join(' + ') || '-') + kv('Date of first visit', s.firstVisit) + kv('1st visit volunteer', s.firstVol) +
+      (s.species ? '<div class="wide"><dt>Species and remarks</dt><dd class="small">' + esc(s.species) + '</dd></div>' : '') +
+      '</dl><p class="small" style="margin-top:12px">Something wrong in these details? "Update details" comes in D4.</p></div>';
+    h += '</div>';
+    setMain(h);
+    document.getElementById('back').addEventListener('click', function () { location.hash = backHash; });
+    wireFirst(); wireForm(); wireCall();
+  });
+}
+/* ===== END P5.2 ===== */
+
+/* ===== START P5.3 First thing on arrival: location, front photo, book ===== */
+// All three are reminders only: nothing else waits for them.
+function firstBox(s) {
+  var f = s.first, isAdmin = APP.me.role === 'Admin';
+  var h = '<h3>' + WORDS.firstTitle + '</h3><p class="small">' + WORDS.firstHelp + '</p><div class="first-items">';
+  // location
+  h += '<div class="item"><b>📍 ' + WORDS.locTitle + '</b>';
+  if (f.location) {
+    h += chip('Saved ' + f.locationDate, 'good') + '<div style="margin-top:6px"><a class="btn sm" href="' + esc(f.location) + '" target="_blank" rel="noopener">Open in Google Maps</a></div>' +
+         '<div style="text-align:right;margin-top:6px"><button class="link small" type="button" id="locchange">Change location</button></div>' +
+         '<div id="locreason" hidden><label class="f" style="margin-top:6px">Why are you changing it?<input type="text" id="locwhy" placeholder="For example: the first pin was on the road"></label>' +
+         '<button class="btn sm primary" type="button" id="locgo" style="margin-top:6px">📍 Save my current location</button></div>';
+  } else {
+    h += '<p class="small">Stand at the school gate and tap the button.</p><button class="btn primary" type="button" id="locgo">📍 Save my current location</button>';
+  }
+  h += '<div id="locmsg"></div></div>';
+  // front photo
+  h += '<div class="item"><b>📷 ' + WORDS.photoTitle + '</b>';
+  if (f.photo) {
+    h += chip('Saved ' + f.photoDate, 'good') + (isAdmin ? '<div style="margin-top:6px"><a class="link small" href="' + esc(f.photo) + '" target="_blank" rel="noopener">Open the photo</a></div>' : '');
+  } else {
+    h += '<p class="small">One photo of the school front, taken once.</p><label class="btn primary">📷 Take or choose photo<input type="file" id="photofile" accept="image/*" hidden></label>';
+  }
+  h += '<div id="photomsg"></div></div>';
+  // book
+  h += '<div class="item"><b>📗 ' + WORDS.bookTitle + '</b>' +
+       '<div style="display:flex;gap:8px;margin-top:4px"><button class="btn' + (f.book === 'Yes' ? ' primary' : '') + '" type="button" data-book="Yes">Yes</button>' +
+       '<button class="btn' + (f.book === 'No' ? ' primary' : '') + '" type="button" data-book="No">No</button></div>' +
+       (f.book ? '<div class="small" style="margin-top:6px">Saved: ' + esc(f.book) + ', ' + esc(f.bookDate) + '</div>' : '') + '<div id="bookmsg"></div></div>';
+  return h + '</div>';
+}
+function wireFirst() {
+  var s = APP.school;
+  var ch = document.getElementById('locchange');
+  if (ch) ch.addEventListener('click', function () { document.getElementById('locreason').hidden = false; ch.hidden = true; });
+  var go = document.getElementById('locgo');
+  if (go) go.addEventListener('click', function () {
+    var msg = document.getElementById('locmsg'), why = document.getElementById('locwhy');
+    if (s.first.location && why && !why.value.trim()) { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">Write why you are changing it.</div>'; return; }
+    if (!navigator.geolocation) { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">This phone cannot share its location.</div>'; return; }
+    go.disabled = true; go.textContent = 'Finding your location…';
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      apiCall('saveLocation', { schoolId: s.id, lat: pos.coords.latitude, lng: pos.coords.longitude, reason: why ? why.value : '' }).then(function (res) {
+        if (!res.ok) { go.disabled = false; go.textContent = '📍 Save my current location'; msg.innerHTML = '<div class="msg bad" style="margin-top:6px">' + esc(res.error) + '</div>'; return; }
+        toast('Location saved (within about ' + Math.round(pos.coords.accuracy) + ' m).');
+        route();
+      });
+    }, function (err) {
+      go.disabled = false; go.textContent = '📍 Save my current location';
+      msg.innerHTML = '<div class="msg bad" style="margin-top:6px">' + (err.code === 1 ? 'Location permission was refused. Allow location for this site in the browser settings and try again.' : 'Could not get the location. Go outside or switch on GPS and try again.') + '</div>';
+    }, { enableHighAccuracy: true, timeout: 25000, maximumAge: 0 });
+  });
+  var pf = document.getElementById('photofile');
+  if (pf) pf.addEventListener('change', function () {
+    var file = pf.files && pf.files[0], msg = document.getElementById('photomsg');
+    if (!file) return;
+    msg.innerHTML = '<div class="small" style="margin-top:6px">Uploading…</div>';
+    shrinkFile(file).then(function (f) {
+      return apiCall('saveFrontPhoto', { schoolId: s.id, data: f.data });
+    }).then(function (res) {
+      if (!res.ok) { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">' + esc(res.error) + '</div>'; return; }
+      toast('Front photo saved.'); route();
+    }).catch(function () { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">Upload failed. Check the internet and try again.</div>'; });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-book]'), function (b) {
+    b.addEventListener('click', function () {
+      apiCall('saveBook', { schoolId: s.id, value: b.dataset.book }).then(function (res) {
+        if (!res.ok) { document.getElementById('bookmsg').innerHTML = '<div class="msg bad" style="margin-top:6px">' + esc(res.error) + '</div>'; return; }
+        toast('Saved.'); route();
+      });
+    });
+  });
+}
+/* ===== END P5.3 ===== */
+
+/* ===== START P5.4 Physical (A4) form: download and upload ===== */
+function formBox(s) {
+  var h = '<h3>📄 ' + WORDS.formTitle + '</h3><p class="small">' + WORDS.formHelp + '</p>' +
+    '<a class="btn" href="' + CONFIG.A4_FORM_FILE + '" download>⬇ Download the A4 form</a>' +
+    '<div class="line"></div><b>Upload the filled form</b>' +
+    '<div class="form"><label>Date of the visit<input type="date" id="a4date" value="' + todayIST() + '" max="' + todayIST() + '"></label></div>' +
+    '<label class="btn primary">📷 Take or choose photos<input type="file" id="a4files" accept="image/*,application/pdf" multiple hidden></label>' +
+    '<span class="small" id="a4count" style="margin-left:8px">No photo chosen (up to 5)</span>' +
+    '<div class="thumbs" id="a4thumbs"></div>' +
+    '<label class="f" style="margin-top:8px">Note for the office (optional)<input type="text" id="a4note" placeholder="For example: photo 2 is the back side"></label>' +
+    '<div id="a4msg"></div><button class="btn primary" id="a4send" type="button" style="margin-top:10px">Upload</button>';
+  if (s.a4 && s.a4.length) {
+    h += '<p class="small" style="margin:14px 0 4px"><b>Uploaded for this school</b></p>' + s.a4.map(function (u) {
+      return '<div class="list-row">' + esc(u.visitDate) + ' · ' + u.files + ' file' + (u.files === 1 ? '' : 's') + ' · ' + esc(u.by) + ' ' +
+        (u.entered ? chip('Entered by the office', 'good') : chip('Waiting for the office')) + '</div>';
+    }).join('');
+  }
   return h;
+}
+function wireForm() {
+  var s = APP.school, input = document.getElementById('a4files');
+  APP.a4files = [];
+  input.addEventListener('change', function () {
+    var picked = Array.prototype.slice.call(input.files || []).slice(0, 5);
+    document.getElementById('a4count').textContent = 'Preparing…';
+    document.getElementById('a4msg').innerHTML = '';
+    Promise.all(picked.map(shrinkFile)).then(function (files) {
+      APP.a4files = files;
+      document.getElementById('a4count').textContent = files.length + ' file' + (files.length === 1 ? '' : 's') + ' chosen';
+      document.getElementById('a4thumbs').innerHTML = files.map(function (f) {
+        return f.type === 'application/pdf' ? '<span class="chip">PDF</span>' : '<img src="' + f.data + '" alt="Chosen photo">';
+      }).join('');
+    });
+  });
+  document.getElementById('a4send').addEventListener('click', function () {
+    var msg = document.getElementById('a4msg'), btn = this, date = document.getElementById('a4date').value;
+    if (!date) { msg.innerHTML = '<div class="msg bad" style="margin-top:10px">Choose the date of the visit.</div>'; return; }
+    if (!APP.a4files.length) { msg.innerHTML = '<div class="msg bad" style="margin-top:10px">Choose at least one photo of the filled form.</div>'; return; }
+    btn.disabled = true; btn.textContent = 'Uploading…';
+    apiCall('uploadA4', { schoolId: s.id, visitDate: date, note: document.getElementById('a4note').value, files: APP.a4files })
+      .then(function (res) {
+        btn.disabled = false; btn.textContent = 'Upload';
+        if (!res.ok) { msg.innerHTML = '<div class="msg bad" style="margin-top:10px">' + esc(res.error) + '</div>'; return; }
+        toast(WORDS.formDone); route();
+      }).catch(function () {
+        btn.disabled = false; btn.textContent = 'Upload';
+        msg.innerHTML = '<div class="msg bad" style="margin-top:10px">Upload failed. Check the internet and try again.</div>';
+      });
+  });
+}
+/* ===== END P5.4 ===== */
+
+/* ===== START P5.5 Call log ===== */
+function callBox(s) {
+  var opts = function (list) { return '<option value="">Choose…</option>' + list.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join(''); };
+  var h = '<h3>📞 ' + WORDS.callTitle + '</h3><div class="msg warn">' + WORDS.callHelp + '</div>' +
+    '<dl class="kv"><div><dt>Head master or principal</dt><dd>' + esc(s.hmName || '-') + phoneLine(s.hmPhone) + '</dd></div>' +
+    (s.altName || s.altPhone ? '<div><dt>Alternative contact</dt><dd>' + esc(s.altName || '-') + phoneLine(s.altPhone) + '</dd></div>' : '') + '</dl>' +
+    '<button class="btn" type="button" id="callopen" style="margin-top:12px">+ Log a call</button>' +
+    '<div id="callform" hidden><div class="form">' +
+    '<label>Date of the call<input type="date" id="cdate" value="' + todayIST() + '" max="' + todayIST() + '"></label>' +
+    '<label>Who did you speak to?<select id="cwho">' + opts(s.lists.callWho) + '</select><input type="text" id="cwhoo" placeholder="Who?" hidden></label>' +
+    '<label>How did the call go?<select id="chow">' + opts(s.lists.callHow) + '</select><input type="text" id="chowo" placeholder="What happened?" hidden></label>' +
+    '<label>Next visit planned (optional)<input type="date" id="cnext" min="' + todayIST() + '"></label>' +
+    '<label class="wide">Notes<textarea id="cnotes" placeholder="Anything worth noting"></textarea></label>' +
+    '<label class="check wide"><input type="checkbox" id="cnot"> <span><b>' + WORDS.notWilling + '</b><br><span class="small">Write the reason in the notes.</span></span></label>' +
+    '</div><div id="cmsg"></div><button class="btn primary" type="button" id="csave">Save call</button> <button class="btn" type="button" id="ccancel">Cancel</button></div>';
+  if (s.calls && s.calls.length) {
+    h += '<p class="small" style="margin:14px 0 4px"><b>Recent calls</b></p>' + s.calls.map(function (c) {
+      return '<div class="list-row"><b>' + esc(c.date) + '</b> · ' + esc(c.who === 'Other' && c.whoOther ? c.whoOther : c.who) + ' · ' + esc(c.how === 'Other' && c.howOther ? c.howOther : c.how) +
+        (c.notWilling ? ' ' + chip(WORDS.notWilling, 'bad') : '') + (c.notes ? '<div class="small">' + esc(c.notes) + '</div>' : '') +
+        (c.next ? '<div class="small">Next visit planned: ' + esc(c.next) + '</div>' : '') + '</div>';
+    }).join('');
+  }
+  return h;
+}
+function wireCall() {
+  var s = APP.school;
+  document.getElementById('callopen').addEventListener('click', function () { document.getElementById('callform').hidden = false; this.hidden = true; });
+  document.getElementById('ccancel').addEventListener('click', function () { document.getElementById('callform').hidden = true; document.getElementById('callopen').hidden = false; });
+  [['cwho', 'cwhoo'], ['chow', 'chowo']].forEach(function (p) {
+    document.getElementById(p[0]).addEventListener('change', function () { document.getElementById(p[1]).hidden = this.value !== 'Other'; });
+  });
+  document.getElementById('csave').addEventListener('click', function () {
+    var btn = this, msg = document.getElementById('cmsg'), v = function (id) { return document.getElementById(id).value; };
+    if (!v('cwho')) { msg.innerHTML = '<div class="msg bad">Choose who you spoke to.</div>'; return; }
+    if (!v('chow')) { msg.innerHTML = '<div class="msg bad">Choose how the call went.</div>'; return; }
+    var not = document.getElementById('cnot').checked;
+    if (not && !v('cnotes').trim()) { msg.innerHTML = '<div class="msg bad">Write the reason the school is not willing, in the notes.</div>'; return; }
+    btn.disabled = true; btn.textContent = 'Saving…';
+    apiCall('saveCall', { schoolId: s.id, date: v('cdate'), who: v('cwho'), whoOther: v('cwhoo'), how: v('chow'), howOther: v('chowo'),
+                          next: v('cnext'), notes: v('cnotes'), notWilling: not }).then(function (res) {
+      btn.disabled = false; btn.textContent = 'Save call';
+      if (!res.ok) { msg.innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
+      toast('Call saved.'); route();
+    });
+  });
 }
 function phoneLine(num) {
   var d = String(num || '').replace(/\D/g, '');
   if (!d) return '';
   return '<div class="phone"><span>' + esc(num) + '</span><a class="btn sm" href="tel:' + (d.length === 10 ? '+91' + d : d) + '">Call</a></div>';
 }
-/* ===== END P5.2 ===== */
+/* ===== END P5.5 ===== */
+
+/* ===== START P5.6 Photo and date helpers ===== */
+// Makes a photo at most 2000 pixels on its long side (JPEG), so uploads are quick but still readable.
+function shrinkFile(file) {
+  return new Promise(function (ok) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      if (/pdf/i.test(file.type)) { ok({ type: 'application/pdf', data: reader.result }); return; }
+      var img = new Image();
+      img.onload = function () {
+        var max = 2000, w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h));
+        var c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        ok({ type: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.85) });
+      };
+      img.onerror = function () { ok({ type: 'image/jpeg', data: reader.result }); };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+function todayIST() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+}
+/* ===== END P5.6 ===== */
 
 /* ===== START P7.1 Volunteers list ===== */
 // Admin sees everybody; a coordinator sees only their own volunteers.
 function screenVolunteers() {
-  setMain('<h2>Volunteers</h2><p class="small">Loading…</p>');
+  var isAdmin = APP.me.role === 'Admin';
+  setMain(subTabs() + '<h2>' + (isAdmin ? 'All people in the Vol tab' : 'Your volunteers') + '</h2><p class="small">Loading…</p>');
   apiCall('volunteers').then(function (res) {
-    if (!res.ok) { setMain('<div class="msg bad">' + esc(res.error) + '</div>'); return; }
+    if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); return; }
     APP.vols = res.volunteers || [];
-    var isAdmin = APP.me.role === 'Admin';
-    var h = '<h2>' + (isAdmin ? 'All people in the Vol tab' : 'Your volunteers') + '</h2>';
+    var h = subTabs() + '<h2>' + (isAdmin ? 'All people in the Vol tab' : 'Your volunteers') + '</h2>';
     h += '<div class="filters"><input type="search" id="vq" placeholder="Search name, email, centre or area" style="min-width:260px">' +
          '<select id="vshow"><option value="">Everyone</option><option value="none">No schools yet</option><option value="with">With schools</option>' +
          (isAdmin ? '<option value="check">Email to check</option><option value="inactive">Inactive</option>' : '') + '</select>' +
          (isAdmin ? '<button class="btn sm" id="vrefresh" type="button">Refresh volunteers from the sign-up form</button>' : '') + '</div>';
     h += '<div id="vlist"></div>';
-    setMain(h);
+    setMain(h); wireSubTabs();
     document.getElementById('vq').addEventListener('input', drawVolunteers);
     document.getElementById('vshow').addEventListener('change', drawVolunteers);
     if (isAdmin) document.getElementById('vrefresh').addEventListener('click', function (ev) {
       ev.target.disabled = true; ev.target.textContent = 'Refreshing…';
-      apiCall('refreshVolunteers').then(function (r) { toast(r.ok ? r.added + ' new volunteer(s) added.' : r.error); screenVolunteers(); });
+      apiCall('refreshVolunteers').then(function (r) { toast(r.ok ? r.added + ' new volunteer(s) added.' : r.error); route(); });
     });
     drawVolunteers();
   });
@@ -315,7 +571,8 @@ function drawVolunteers() {
   });
   var h = '<p class="small">' + list.length + ' shown</p><div class="tbl-wrap"><table><thead><tr><th>#</th><th>Name</th><th>Role · Status</th><th>Phone</th><th>Centre</th><th class="n">Wants</th><th class="n">Schools allotted</th><th>Preferred area</th></tr></thead><tbody>';
   list.forEach(function (v, i) {
-    h += '<tr><td>' + (i + 1) + '</td><td><b>' + esc(v.name) + '</b><div class="small">' + esc(v.email) + '</div>' + (v.note ? chip(v.note, /check/i.test(v.note) ? 'warn' : '') : '') + '</td>' +
+    h += '<tr><td>' + (i + 1) + '</td><td><b>' + esc(v.name) + '</b><div class="small">' + esc(v.email) + '</div>' + (v.note ? chip(v.note, /check/i.test(v.note) ? 'warn' : '') : '') +
+      (v.schoolNames && v.schoolNames.length ? '<div class="small">' + esc(v.schoolNames.join(' · ')) + '</div>' : '') + '</td>' +
       '<td>' + esc(v.role) + '<br>' + chip(v.status, /^active$/i.test(v.status) ? 'good' : 'bad') + '</td>' +
       '<td>' + esc(v.phone || '-') + '</td><td>' + esc(v.centre || '-') + '</td><td class="n">' + esc(v.wants || '-') + '</td>' +
       '<td class="n"><b>' + v.schools + '</b></td><td>' + esc(v.area || '-') + '</td></tr>';
@@ -324,27 +581,29 @@ function drawVolunteers() {
 }
 /* ===== END P7.1 ===== */
 
-/* ===== START P7.2 Admin overview ===== */
-function screenOverview() {
-  setMain('<h2>Overview</h2><p class="small">Loading…</p>');
+/* ===== START P7.2 Admin dashboard ===== */
+function screenDashboard() {
+  setMain(subTabs() + '<h2>Dashboard</h2><p class="small">Loading…</p>');
   apiCall('overview').then(function (res) {
-    if (!res.ok) { setMain('<div class="msg bad">' + esc(res.error) + '</div>'); return; }
+    if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); return; }
     var o = res.overview;
     var t = function (n, l) { return '<div class="tile"><div class="n">' + fmtN(n) + '</div><div class="l">' + l + '</div></div>'; };
-    setMain('<h2>Overview</h2><div class="grid-tiles">' +
+    setMain(subTabs() + '<h2>Dashboard</h2><div class="grid-tiles">' +
       t(o.schools, 'schools in all') + t(o.grouped, 'in ' + fmtN(o.groups) + ' groups') + t(o.caution, 'not ready or merged') +
       t(o.assigned, 'schools assigned') + t(o.groupsFree, 'groups with no volunteer yet') +
       t(o.volunteersActive, 'active volunteers') + t(o.coordinatorsActive, 'active coordinators') + t(o.adminsActive, 'active admins') +
       t(o.inactive, 'inactive in the Vol tab') + t(o.emailChecks, 'emails to check') +
-      '</div><p class="small" style="margin-top:14px">Giving schools to volunteers comes in the next step.</p>');
+      '</div><p class="small" style="margin-top:14px">Visit and survival numbers come in D5.</p>');
+    wireSubTabs();
   });
 }
 /* ===== END P7.2 ===== */
 
-/* ===== START P7.3 Find schools (admin) ===== */
+/* ===== START P7.3 Admin: schools (assignments come in D2) ===== */
 var FIND = { taluk: '', hobli: '', gp: '', q: '', show: '' };
-function screenFind() {
-  setMain('<h2>Schools</h2><div class="filters" id="ff"></div><div id="flist"><p class="small">Loading…</p></div>');
+function screenAssign() {
+  setMain(subTabs() + '<h2>Assignments</h2><div class="msg warn" style="margin-bottom:12px">Giving schools to volunteers from here comes in D2. For now, find and open any school.</div><div class="filters" id="ff"></div><div id="flist"><p class="small">Loading…</p></div>');
+  wireSubTabs();
   runFind();
 }
 function runFind() {
@@ -358,7 +617,7 @@ function runFind() {
       '<select data-f="show"><option value="">All schools</option><option value="free"' + (FIND.show === 'free' ? ' selected' : '') + '>Not assigned</option><option value="assigned"' + (FIND.show === 'assigned' ? ' selected' : '') + '>Assigned</option><option value="caution"' + (FIND.show === 'caution' ? ' selected' : '') + '>Not ready or merged</option></select>' +
       '<input type="search" data-f="q" placeholder="School, village, UDISE or Vol number" value="' + esc(FIND.q) + '" style="min-width:240px">';
     Array.prototype.forEach.call(document.querySelectorAll('#ff [data-f]'), function (el) {
-      el.addEventListener(el.tagName === 'INPUT' ? 'change' : 'change', function () {
+      el.addEventListener('change', function () {
         FIND[el.dataset.f] = el.value;
         if (el.dataset.f === 'taluk') { FIND.hobli = ''; FIND.gp = ''; }
         if (el.dataset.f === 'hobli') FIND.gp = '';
@@ -366,62 +625,131 @@ function runFind() {
         runFind();
       });
     });
-    var h = '<p class="small">' + fmtN(res.total) + ' school' + (res.total === 1 ? '' : 's') + (res.total > res.schools.length ? ', first ' + res.schools.length + ' shown' : '') + '. Press Enter after typing in the search box.</p>';
+    var h = '<p class="small">' + fmtN(res.total) + ' school' + (res.total === 1 ? '' : 's') + (res.total > res.schools.length ? ', first ' + res.schools.length + ' shown' : '') + '. Tap a row to open the school. Press Enter after typing in the search box.</p>';
     h += '<div class="tbl-wrap"><table><thead><tr><th class="n">Sl. No.</th><th>School</th><th>Place</th><th>Group</th><th>Given</th><th>Assigned to</th></tr></thead><tbody>';
     res.schools.forEach(function (s) {
       var given = [s.saplings ? fmtN(s.saplings) + ' saplings' : '', s.seeds ? fmtN(s.seeds) + ' seeds' : ''].filter(String).join(' + ');
-      h += '<tr><td class="n">' + s.id + '</td><td><b>' + esc(s.name) + '</b><div class="small">' + esc(s.udise) + '</div>' + (s.caution ? chip(s.activity === 'Not Ready' ? 'Not ready' : 'Merged', 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') + '</td>' +
+      h += '<tr class="click" data-open="' + s.id + '"><td class="n">' + s.id + '</td><td><b>' + esc(s.name) + '</b><div class="small">' + esc(s.udise) + '</div>' + (s.caution ? chip(s.activity === 'Not Ready' ? 'Not ready' : 'Merged', 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') + '</td>' +
         '<td>' + esc(s.taluk) + '<div class="small">' + esc([s.hobli, s.gp, s.village].join(' · ')) + '</div></td>' +
         '<td>' + (s.group ? 'Vol ' + s.groupNo : '-') + '</td><td>' + esc(given || '-') + '</td><td>' + esc(s.assignedTo || '-') + '</td></tr>';
     });
     document.getElementById('flist').innerHTML = h + '</tbody></table></div>';
+    Array.prototype.forEach.call(document.querySelectorAll('#flist [data-open]'), function (tr) {
+      tr.addEventListener('click', function () { location.hash = 'admin/school/' + tr.dataset.open; });
+    });
   });
 }
 /* ===== END P7.3 ===== */
 
-/* ===== START P10.2 Screens, tabs and the phone Back button ===== */
-// Each tab has its own address (#schools, #volunteers ...), so the phone's Back button
-// moves between tabs instead of closing the page.
-var SCREENS = {
-  schools: { label: function () { return WORDS.tabSchools; }, show: screenMySchools, roles: ['Volunteer', 'Coordinator', 'Admin'] },
-  volunteers: { label: function () { return WORDS.tabVolunteers; }, show: screenVolunteers, roles: ['Coordinator', 'Admin'] },
-  overview: { label: function () { return WORDS.tabOverview; }, show: screenOverview, roles: ['Admin'] },
-  find: { label: function () { return WORDS.tabFind; }, show: screenFind, roles: ['Admin'] }
+/* ===== START P7.4 Admin: uploaded A4 forms ===== */
+// The office works from this list. Entering the form into the app comes in D3.
+function screenA4List() {
+  setMain(subTabs() + '<h2>Uploaded A4 forms</h2><p class="small">Loading…</p>');
+  apiCall('a4List').then(function (res) {
+    if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); return; }
+    var list = res.uploads || [];
+    var h = subTabs() + '<h2>Uploaded A4 forms</h2><p class="small">' + list.length + ' upload' + (list.length === 1 ? '' : 's') + '. Entering them into the app comes in D3.</p>';
+    if (!list.length) { setMain(h + '<div class="card">Nothing uploaded yet.</div>'); wireSubTabs(); return; }
+    h += '<div class="tbl-wrap"><table><thead><tr><th>Visit date</th><th>School</th><th>Volunteer</th><th>Files</th><th>Note</th><th>Status</th></tr></thead><tbody>';
+    list.forEach(function (u) {
+      h += '<tr><td>' + esc(u.visitDate) + '<div class="small">uploaded ' + esc(u.uploadedOn) + '</div></td><td><button class="link" type="button" data-open="' + u.schoolId + '">' + esc(u.school) + '</button></td><td>' + esc(u.by) + '</td>' +
+        '<td>' + u.links.map(function (l, i) { return '<a class="link" href="' + esc(l) + '" target="_blank" rel="noopener">File ' + (i + 1) + '</a>'; }).join('<br>') + '</td>' +
+        '<td>' + esc(u.note || '-') + '</td><td>' + (u.entered ? chip('Entered', 'good') : chip('Waiting', 'warn')) + '</td></tr>';
+    });
+    setMain(h + '</tbody></table></div>'); wireSubTabs();
+    Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) {
+      b.addEventListener('click', function () { location.hash = 'admin/school/' + b.dataset.open; });
+    });
+  });
+}
+/* ===== END P7.4 ===== */
+
+/* ===== START P7.5 Screens coming later ===== */
+function screenComing(title, when, text) {
+  setMain(subTabs() + '<h2>' + esc(title) + '</h2><div class="card"><p>' + esc(text) + '</p><p class="small">Comes in ' + esc(when) + '.</p></div>');
+  wireSubTabs();
+}
+/* ===== END P7.5 ===== */
+
+/* ===== START P8.1 Map (comes in D5) ===== */
+function screenMap() {
+  setMain('<h2>Map</h2><div class="card"><p>The map of schools comes in D5: approximate positions first, replaced by the real GPS pin once a volunteer saves the school location.</p></div>');
+}
+/* ===== END P8.1 ===== */
+
+/* ===== START P10.2 Tabs, screens and the phone Back button ===== */
+// Top tabs: Volunteer · Coordinator · Admin · Map (each person sees only their own).
+// Every screen has its own address (#vol, #admin/dashboard, #vol/school/12 ...), so the
+// phone's Back button moves back inside the app instead of closing it.
+var TOP = {
+  vol: { label: 'tabVolunteer', roles: ['Volunteer', 'Coordinator', 'Admin'] },
+  coord: { label: 'tabCoordinator', roles: ['Coordinator'], subs: [['volunteers', 'Volunteers'], ['assign', 'Assignments'], ['corrections', 'Corrections']] },
+  admin: { label: 'tabAdmin', roles: ['Admin'], subs: [['dashboard', 'Dashboard'], ['assign', 'Assignments'], ['volunteers', 'Volunteers'], ['coordinators', 'Coordinators'], ['a4', 'A4 forms'], ['corrections', 'Corrections']] },
+  map: { label: 'tabMap', roles: ['Volunteer', 'Coordinator', 'Admin'] }
 };
-function myScreens() {
-  return Object.keys(SCREENS).filter(function (k) { return SCREENS[k].roles.indexOf(APP.me.role) >= 0; });
+function myTops() {
+  return Object.keys(TOP).filter(function (k) {
+    if (TOP[k].roles.indexOf(APP.me.role) < 0) return false;
+    if (k === 'map' && APP.me.role === 'Volunteer') return /^on$/i.test(APP.settings.mapVolunteers);
+    if (k === 'map' && APP.me.role === 'Coordinator') return /^on$/i.test(APP.settings.mapCoordinators);
+    return true;
+  });
 }
 function buildTabs() {
-  var keys = myScreens();
-  document.getElementById('tabs').innerHTML = keys.map(function (k) {
-    return '<button role="tab" type="button" data-tab="' + k + '">' + SCREENS[k].label() + '</button>';
+  document.getElementById('tabs').innerHTML = myTops().map(function (k) {
+    return '<button role="tab" type="button" data-tab="' + k + '">' + WORDS[TOP[k].label] + '</button>';
   }).join('');
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) {
     b.addEventListener('click', function () { location.hash = b.dataset.tab; });
   });
 }
+function subTabs() {
+  var top = APP.where.top, t = TOP[top];
+  if (!t || !t.subs) return '';
+  return '<div class="subtabs">' + t.subs.map(function (s) {
+    return '<button type="button" data-sub="' + top + '/' + s[0] + '" aria-selected="' + (APP.where.sub === s[0]) + '">' + s[1] + '</button>';
+  }).join('') + '</div>';
+}
+function wireSubTabs() {
+  Array.prototype.forEach.call(document.querySelectorAll('[data-sub]'), function (b) {
+    b.addEventListener('click', function () { location.hash = b.dataset.sub; });
+  });
+}
 function route() {
   if (!APP.me) return;
-  var keys = myScreens();
-  var want = (location.hash || '').replace('#', '');
-  if (keys.indexOf(want) < 0) want = APP.me.role === 'Admin' ? 'overview' : APP.me.role === 'Coordinator' ? 'volunteers' : 'schools';
-  Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === want)); });
-  SCREENS[want].show();
+  var tops = myTops();
+  var parts = (location.hash || '').replace('#', '').split('/');
+  var top = tops.indexOf(parts[0]) >= 0 ? parts[0] : (APP.me.role === 'Admin' ? 'admin' : APP.me.role === 'Coordinator' ? 'coord' : 'vol');
+  var sub = parts[1] || '';
+  if (TOP[top].subs && sub !== 'school' && !TOP[top].subs.some(function (s) { return s[0] === sub; })) sub = TOP[top].subs[0][0];
+  APP.where = { top: top, sub: sub };
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === top)); });
   window.scrollTo(0, 0);
+  if (sub === 'school' && parts[2]) return screenSchool(parts[2], top === 'vol' ? 'vol' : top + '/assign');
+  if (top === 'vol') return screenMySchools();
+  if (top === 'map') return screenMap();
+  if (sub === 'volunteers') return screenVolunteers();
+  if (sub === 'dashboard') return screenDashboard();
+  if (sub === 'a4') return screenA4List();
+  if (sub === 'assign' && top === 'admin') return screenAssign();
+  if (sub === 'assign') return screenComing('Assignments', 'D2', 'Here you will give free schools to your own volunteers.');
+  if (sub === 'coordinators') return screenComing('Coordinators', 'D2', 'Here you will make volunteers coordinators and give volunteers to coordinators in bulk.');
+  if (sub === 'corrections') return screenComing('Corrections', 'D4', 'Here you will approve the changes volunteers propose with "Update details".');
 }
 window.addEventListener('hashchange', route);
 /* ===== END P10.2 ===== */
 
 /* ===== START P10.3 Small helpers ===== */
-var APP = { token: '', clientId: '', me: null, settings: {}, vols: [] };
+var APP = { token: '', clientId: '', me: null, settings: {}, vols: [], school: null, a4files: [], where: { top: '', sub: '' } };
 function esc(v) { return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function fmtN(n) { return (n === null || n === undefined || n === '') ? '-' : Number(n).toLocaleString('en-IN'); }
 function chip(t, kind) { return '<span class="chip' + (kind ? ' ' + kind : '') + '">' + esc(t) + '</span>'; }
 function kv(label, value) { return '<div><dt>' + esc(label) + '</dt><dd>' + esc(value === '' || value === null || value === undefined ? '-' : value) + '</dd></div>'; }
 function setMain(html) { document.getElementById('main').innerHTML = html; }
 function toast(text) {
+  Array.prototype.forEach.call(document.querySelectorAll('.toast'), function (x) { x.remove(); });
   var t = document.createElement('div');
-  t.className = 'msg'; t.textContent = text;
+  t.className = 'msg good toast'; t.textContent = text;
   t.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:9;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:90vw';
   document.body.appendChild(t);
   setTimeout(function () { t.remove(); }, 3500);
@@ -431,7 +759,7 @@ function toast(text) {
 /* ===== START P10.4 Start ===== */
 document.getElementById('signout').addEventListener('click', function () { signOut(''); });
 (function start() {
-  if (!INSIDE_APPS_SCRIPT && !/\/exec$/.test(CONFIG.EXEC_URL)) {
+  if (!/\/exec$/.test(CONFIG.EXEC_URL)) {
     setMain('<div class="signin-box"><div class="msg bad">The web app link is not filled in yet. Put it in section P2.1 of this file.</div></div>');
     return;
   }
