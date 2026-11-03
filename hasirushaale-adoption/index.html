@@ -1,1 +1,157 @@
+<!doctype html>
+<!--
+  =====================================================================
+   index.html  |  Hasiru Shaale adoption app: the page (GitHub Pages)
+  =====================================================================
+   What this file does : everything people see. It talks to Code.gs
+                         through the web app link in section P2.1.
+   Where it lives      : for testing, an HTML file named "index" inside the
+                         Apps Script project (opened with the /exec link).
+                         Later: GitHub, hasiruchikkaballapura.github.io,
+                         in its own folder (for example hasiru-adoption/).
+                         The same file works in both places.
+   Data                : none is stored in this file. All data stays in
+                         the Google Sheet.
+
+   HOW TO CHANGE ONE PART
+   Every section sits between a START line and an END line, e.g.
+      /* ===== START P1.1 Colours ===== */   ...   /* ===== END P1.1 ===== */
+   To replace a section: Ctrl+F the START line, select from it down to
+   its END line (both included), paste the new section, Commit changes.
+
+   CONTENTS
+    P0.0  Version
+    P1    Style
+      P1.1  Colours (light and dark)
+      P1.2  Page layout
+    P2    Config
+      P2.1  Web app link
+    P3    Backend calls
+      P3.1  Call Code.gs
+    P10   Start-up
+      P10.1 Page body
+      P10.2 Connection check
+  =====================================================================
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hasiru Shaale · School adoption</title>
+
+<!-- ===== START P0.0 Version ===== -->
+<meta name="app-version" content="2026-11-03 v2">
+<!-- ===== END P0.0 ===== -->
+
+<style>
+/* ===== START P1.1 Colours (light and dark) ===== */
+:root {
+  --bg: #f6f8f6; --surface: #ffffff; --ink: #17231c; --muted: #5c6b62; --line: #d5ddd7;
+  --accent: #2f6b45; --accent-soft: #eaf3ec; --good: #2f6b45; --bad: #b3261e; --bad-soft: #fbeaea;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111713; --surface: #1a221d; --ink: #e6efe8; --muted: #9fb0a5; --line: #2c3a31;
+    --accent: #7cc796; --accent-soft: #1f3327; --good: #7cc796; --bad: #f2b8b5; --bad-soft: #3a1f1e;
+  }
+}
+/* ===== END P1.1 ===== */
+
+/* ===== START P1.2 Page layout ===== */
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding: 24px max(16px, env(safe-area-inset-right)) 40px max(16px, env(safe-area-inset-left));
+}
+.wrap { max-width: 560px; margin: 0 auto; }
+.brand { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+h1 { font-size: 26px; line-height: 1.15; margin: 4px 0 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+.status { display: flex; gap: 10px; align-items: flex-start; }
+.dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 6px; flex: none; background: var(--muted); }
+.ok .dot { background: var(--good); }
+.bad .dot { background: var(--bad); }
+.bad { color: var(--bad); }
+.small { font-size: 14px; color: var(--muted); }
+button { font: inherit; padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; margin-top: 14px; }
+button:hover { border-color: var(--accent); }
+/* ===== END P1.2 ===== */
+</style>
+</head>
+<body>
+
+<!-- ===== START P10.1 Page body ===== -->
+<div class="wrap">
+  <div class="brand">Hasiru Shaale · Phase 2</div>
+  <h1>School adoption</h1>
+  <div class="card">
+    <div id="status" class="status"><span class="dot"></span><div>Checking the connection…</div></div>
+    <button id="again" type="button" hidden>Check again</button>
+  </div>
+  <p class="small">Test page. Sign-in and the screens come in the next steps.</p>
+</div>
+<!-- ===== END P10.1 ===== -->
+
+<script>
+/* ===== START P2.1 Web app link ===== */
+// Paste the web app link (it ends in /exec) between the quotes.
+var CONFIG = {
+  EXEC_URL: 'https://script.google.com/a/macros/sadhguru.org/s/AKfycbwiPbvvTZoShDMtUDFjSLNMj7LEsSot4F2M30UUgO7pxoUXj93vypjB04l_991g8oBq/exec'
+};
+/* ===== END P2.1 ===== */
+
+/* ===== START P3.1 Call Code.gs ===== */
+// Works in two places:
+//  - opened from the Apps Script /exec link: uses google.script.run (no link needed);
+//  - opened from GitHub: uses the /exec link in P2.1.
+var INSIDE_APPS_SCRIPT = (typeof google !== 'undefined' && google.script && google.script.run);
+function apiCall(action, data) {
+  var req = Object.assign({ action: action }, data || {});
+  if (INSIDE_APPS_SCRIPT) {
+    return new Promise(function (ok, fail) {
+      google.script.run
+        .withSuccessHandler(function (txt) { ok(JSON.parse(txt)); })
+        .withFailureHandler(fail)
+        .apiRun(req);
+    });
+  }
+  return fetch(CONFIG.EXEC_URL, {
+    method: 'POST', redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },   // plain text, so the browser sends it straight away
+    body: JSON.stringify(req)
+  }).then(function (r) { return r.json(); });
+}
+/* ===== END P3.1 ===== */
+
+/* ===== START P10.2 Connection check ===== */
+function showStatus(kind, html) {
+  var el = document.getElementById('status');
+  el.className = 'status ' + kind;
+  el.innerHTML = '<span class="dot"></span><div>' + html + '</div>';
+  document.getElementById('again').hidden = (kind === 'ok');
+}
+function checkConnection() {
+  if (!INSIDE_APPS_SCRIPT && !/\/exec$/.test(CONFIG.EXEC_URL)) {
+    showStatus('bad', 'The web app link is not filled in yet. Put it in section P2.1 of this file.');
+    return;
+  }
+  showStatus('', 'Checking the connection…');
+  apiCall('ping').then(function (res) {
+    if (res && res.ok) {
+      showStatus('ok', '<b>Connected' + (INSIDE_APPS_SCRIPT ? ' (opened from Apps Script)' : '') + '.</b> Backend version ' + res.version + ', time ' + res.time +
+        (res.setupDone ? '. Setup is done.' : '.<br><span class="bad">Setup has not been run yet (run setupAll in the script).</span>'));
+    } else {
+      showStatus('bad', 'The backend answered with a problem: ' + ((res && res.error) || 'unknown'));
+    }
+  }).catch(function () {
+    showStatus('bad', 'Could not reach the backend. Check the link in P2.1, and that the web app is deployed with access "Anyone".');
+  });
+}
+document.getElementById('again').addEventListener('click', checkConnection);
+checkConnection();
+/* ===== END P10.2 ===== */
+</script>
+</body>
+</html>
 
