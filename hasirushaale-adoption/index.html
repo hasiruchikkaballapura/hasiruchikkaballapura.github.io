@@ -11,6 +11,8 @@
    Data                : none is stored in this file. All data stays in
                          the Google Sheet. The sign-in key (Client ID) is
                          fetched from the backend, so it is not typed here.
+                         A half-filled visit form is kept on the phone only
+                         (until it is saved or discarded).
 
    HOW TO CHANGE ONE PART
    Every section sits between a START line and an END line, e.g.
@@ -31,21 +33,30 @@
       P3.2  Google sign-in
     P4    Words
       P4.1  Words used on the screens
-    P5    Volunteer tab
+    P5    Volunteer tab and the school page
       P5.1  My schools (list)
       P5.2  School page
       P5.3  First thing on arrival: location, front photo, book
       P5.4  Physical (A4) form: download and upload
       P5.5  Call log
       P5.6  Photo and date helpers
+      P5.7  School details and Update details
+      P5.8  Media (photos, audio, video)
+      P5.9  Coordinator/admin box on the school page
+    P6    Record your visit
+      P6.1  The visit form
+      P6.2  Form behaviour, draft on the phone, saving
+      P6.3  Visit history
     P7    Coordinator and Admin tabs
-      P7.1  Volunteers list
-      P7.2  Admin dashboard
-      P7.3  Admin: schools (assignments come in D2)
-      P7.4  Admin: uploaded A4 forms
-      P7.5  Screens coming later
+      P7.1  Volunteers list (with remarks and changes)
+      P7.2  Admin dashboard (alerts, numbers, switches)
+      P7.3  Assignments (by group or one by one)
+      P7.4  Admin: uploaded A4 forms (office enters them)
+      P7.5  Alerts block
+      P7.6  Admin: coordinators
+      P7.7  Corrections (approve or reject)
     P8    Map tab
-      P8.1  Map (comes in D5)
+      P8.1  Map
     P10   Start-up
       P10.1 Page body
       P10.2 Tabs, screens and the phone Back button
@@ -60,7 +71,7 @@
 <title>Hasiru Shaale · School adoption</title>
 
 <!-- ===== START P0.0 Version ===== -->
-<meta name="app-version" content="2026-11-03 v6">
+<meta name="app-version" content="2026-11-04 v8">
 <!-- ===== END P0.0 ===== -->
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -71,21 +82,24 @@
   --bg: #f6f8f6; --surface: #ffffff; --surface-2: #f0f4f1; --ink: #17231c; --muted: #5c6b62; --line: #d5ddd7;
   --accent: #2f6b45; --accent-ink: #ffffff; --accent-soft: #eaf3ec;
   --warn: #8a5a00; --warn-soft: #fff4dc; --bad: #b3261e; --bad-soft: #fbeaea; --link: #1a5fb4;
+  --map-given: #1a5fb4; --map-visited: #2f8f4e; --map-free: #7b8a80; --map-bad: #c62828; --map-caution: #d08700;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #111713; --surface: #1a221d; --surface-2: #212b25; --ink: #e6efe8; --muted: #9fb0a5; --line: #2c3a31;
     --accent: #7cc796; --accent-ink: #10261a; --accent-soft: #1f3327;
     --warn: #f3c56b; --warn-soft: #3a2f16; --bad: #f2b8b5; --bad-soft: #3a1f1e; --link: #8ab4f8;
+    --map-given: #8ab4f8; --map-visited: #7cc796; --map-free: #9fb0a5; --map-bad: #f28b82; --map-caution: #f3c56b;
   }
 }
 /* ===== END P1.1 ===== */
 
 /* ===== START P1.2 Page layout ===== */
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; background: var(--bg); color: var(--ink); }
 body { font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-.top { background: var(--surface); border-bottom: 1px solid var(--line); padding: 12px max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); position: sticky; top: 0; z-index: 5; }
+.top { background: var(--surface); border-bottom: 1px solid var(--line); padding: 12px max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); position: sticky; top: 0; z-index: 1000; }
 .top-in, .main { max-width: 980px; margin: 0 auto; }
 .top-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .brand { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
@@ -94,6 +108,7 @@ body { font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; 
 .main { padding: 16px max(16px, env(safe-area-inset-right)) 56px max(16px, env(safe-area-inset-left)); }
 h2 { font-size: 22px; line-height: 1.2; margin: 4px 0 12px; overflow-wrap: anywhere; }
 h3 { font-size: 17px; margin: 0 0 6px; }
+h4 { font-size: 15px; margin: 14px 0 6px; }
 .small { font-size: 14px; color: var(--muted); }
 .stack > * + * { margin-top: 12px; }
 .grid-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
@@ -103,9 +118,11 @@ h3 { font-size: 17px; margin: 0 0 6px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
 .card.caution { border-color: var(--warn); }
 .card.first { border: 2px solid var(--accent); background: var(--accent-soft); }
+.card.bad, .box.bad { border: 2px solid var(--bad); }
 .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
 .tile .n { font-size: 26px; font-weight: 700; line-height: 1.1; }
 .tile .l { font-size: 13px; color: var(--muted); }
+.tile .s { font-size: 13px; color: var(--ink); margin-top: 2px; }
 .chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--muted); margin: 2px 4px 2px 0; }
 .chip.good { background: var(--accent-soft); color: var(--accent); }
 .chip.warn { background: var(--warn-soft); color: var(--warn); }
@@ -113,9 +130,10 @@ h3 { font-size: 17px; margin: 0 0 6px; }
 .btn { font: inherit; font-size: 15px; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-block; }
 .btn:hover { border-color: var(--accent); }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.danger { color: var(--bad); border-color: var(--bad); }
 .btn.sm { font-size: 14px; padding: 5px 10px; }
 .btn[disabled] { opacity: .6; cursor: default; }
-.link { color: var(--link); text-decoration: underline; cursor: pointer; background: none; border: 0; font: inherit; padding: 0; }
+.link { color: var(--link); text-decoration: underline; cursor: pointer; background: none; border: 0; font: inherit; padding: 0; text-align: left; }
 .tabs { display: flex; gap: 4px; overflow-x: auto; margin-top: 10px; }
 .tabs button { font: inherit; font-size: 15px; padding: 8px 12px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
@@ -126,14 +144,29 @@ h3 { font-size: 17px; margin: 0 0 6px; }
 .kv dt { font-size: 12px; color: var(--muted); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
 .kv .wide { grid-column: 1 / -1; }
+.old { font-size: 13px; color: var(--muted); }
 .phone { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-select, input[type=search], input[type=text], input[type=date], textarea { font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); max-width: 100%; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+select, input[type=search], input[type=text], input[type=date], input[type=number], input[type=email], textarea { font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); max-width: 100%; }
+input[type=number] { width: 100%; }
 textarea { width: 100%; min-height: 70px; }
 .form { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: 10px 0; }
 .form label, label.f { font-size: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 4px; }
 .form .wide { grid-column: 1 / -1; }
+.nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-size: 15px; color: var(--ink); }
+.ticks { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 4px 0; }
+.ticks label { display: flex; gap: 6px; align-items: center; font-size: 15px; color: var(--ink); }
+.box { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 10px; background: var(--surface); }
+.box h4 { margin-top: 0; }
+.defs { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.defs b { color: var(--ink); }
+.section-h { font-size: 17px; font-weight: 700; color: var(--accent); margin: 18px 0 6px; padding-bottom: 4px; border-bottom: 2px solid var(--accent); }
+.act-row { display: grid; grid-template-columns: 120px 1fr 80px 70px 70px 90px 90px; gap: 6px; margin-bottom: 6px; }
+.act-head { font-size: 12px; color: var(--muted); }
+@media (max-width: 760px) { .act-row { grid-template-columns: 1fr 1fr; padding-bottom: 8px; border-bottom: 1px dashed var(--line); } .act-head { display: none; } }
+.right { text-align: right; }
+.bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 10px 12px; background: var(--surface-2); border-radius: 10px; margin-bottom: 12px; }
 .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -160,6 +193,17 @@ tr.click:hover td { background: var(--surface-2); }
 .line { border-top: 1px solid var(--line); margin: 12px 0; }
 .list-row { padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
 .list-row:last-child { border-bottom: 0; }
+.alert-row { border-left: 4px solid var(--warn); padding: 8px 12px; background: var(--surface); border-radius: 0 8px 8px 0; margin-bottom: 8px; font-size: 14px; }
+.alert-row.bad { border-left-color: var(--bad); }
+.group { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 12px 14px; margin-bottom: 10px; }
+.group.free { border-left: 4px solid var(--accent); }
+.group.partly { border-left: 4px solid var(--warn); }
+.crumbs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; font-size: 14px; }
+#map { height: calc(100vh - 260px); min-height: 380px; border-radius: 12px; border: 1px solid var(--line); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); margin: 8px 0; }
+.dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
+.dot.hollow { background: transparent !important; border: 2px solid currentColor; }
+.leaflet-popup-content { font-size: 14px; line-height: 1.4; }
 /* ===== END P1.3 ===== */
 </style>
 </head>
@@ -182,7 +226,7 @@ tr.click:hover td { background: var(--surface-2); }
 /* ===== START P2.1 Web app link ===== */
 // Paste the web app link (it ends in /exec) between the quotes.
 var CONFIG = {
-  EXEC_URL: 'https://hasiruchikkaballapura.github.io/hasirushaale-adoption/',
+  EXEC_URL: 'https://script.google.com/macros/s/AKfycbwiPbvvTZoShDMtUDFjSLNMj7LEsSot4F2M30UUgO7pxoUXj93vypjB04l_991g8oBq/exec',
   A4_FORM_FILE: 'a4-visit-form.pdf'     // the printable A4 form, kept in the same GitHub folder
 };
 /* ===== END P2.1 ===== */
@@ -197,8 +241,11 @@ function apiCall(action, data) {
     body: JSON.stringify(req)
   }).then(function (r) { return r.json(); })
     .then(function (res) {
-      if (res && res.needSignIn) { signOut(res.error); throw new Error(res.error); }
+      // signed out: show the sign-in page and stop here (the screen that asked waits for ever)
+      if (res && res.needSignIn) { signOut(res.error); return new Promise(function () { }); }
       return res;
+    }, function () {
+      return { ok: false, error: 'Could not reach the server. Check the internet and try again.' };
     });
 }
 /* ===== END P3.1 ===== */
@@ -261,6 +308,7 @@ var WORDS = {
   tabVolunteer: 'Volunteer', tabCoordinator: 'Coordinator', tabAdmin: 'Admin', tabMap: 'Map',
   mySchools: 'My schools',
   noSchools: 'No schools are assigned to you yet. Your coordinator will assign them soon.',
+  noOwnSchools: 'You have no schools of your own. This tab shows only the schools you adopt yourself. Your volunteers\' schools are in the Coordinator tab.',
   caution: 'Not ready or merged: take care before assigning',
   notWilling: 'School not willing to support',
   firstTitle: 'First thing on arrival',
@@ -273,7 +321,25 @@ var WORDS = {
   formDone: 'Uploaded. Thank you! The office will enter it.',
   callTitle: 'Call the school',
   callHelp: 'If the school does not allow your visit, fill the physical (A4) form during this call, from home.',
-  visitOff: 'Record your visit is switched off for now. Please use the physical (A4) form above.'
+  visitTitle: 'Record your visit',
+  visitOff: 'Record your visit is switched off for now. Please use the physical (A4) form above.',
+  partA: 'A · Sapling Health / Seed Status',
+  partATick: 'Tick what the school received. Tick both if both.',
+  partB: 'B · Engagement with schools (Awareness & Games)',
+  partC: 'C · Any remarks',
+  partCTick: 'This is about (tick all that apply)',
+  oldData: 'Any old data to update?',
+  health: {
+    Healthy: 'New tender leaves are growing. A tree guard is fitted, or there is a proper compound wall. A water source is available and looked after.',
+    Fair: 'Plants are alive but show slow growth and have no protection. Water is managed with difficulty.',
+    Poor: 'Plants look very dull. There is no proper care, protection or water source.'
+  },
+  plantedTooMany: 'Planted is more than the number given. Check the numbers, or correct our record of saplings given.',
+  updateTitle: 'Update details',
+  updateHelp: 'Propose the correct value. Your coordinator or the office approves it; until then the old value stays and both are shown.',
+  mediaTitle: 'Photos, audio and video',
+  alertsTitle: 'Needs attention',
+  notWillingList: 'Schools not willing to support'
 };
 /* ===== END P4.1 ===== */
 
@@ -286,55 +352,62 @@ function screenMySchools() {
     if (!res.ok) { setMain('<div class="msg bad">' + esc(res.error) + '</div>'); return; }
     var list = res.schools || [];
     var h = '<h2>' + WORDS.mySchools + '</h2>';
-    if (!list.length) { setMain(h + '<div class="card">' + WORDS.noSchools + '</div>'); return; }
+    if (!list.length) { setMain(h + '<div class="card">' + (APP.me.role === 'Volunteer' ? WORDS.noSchools : WORDS.noOwnSchools) + '</div>'); return; }
     h += '<p class="small">' + list.length + ' school' + (list.length === 1 ? '' : 's') + ' adopted. Tap a school to open it.</p><div class="stack">';
     list.forEach(function (s, i) {
       h += '<button type="button" class="card school-btn' + (s.caution ? ' caution' : '') + '" data-open="' + s.id + '">' +
         '<h3><span class="sl">' + (i + 1) + '.</span>' + esc(s.name) + '</h3>' +
-        '<div class="small">' + esc([s.village, s.gp, s.hobli, s.taluk].filter(String).join(' · ')) + '</div>' +
+        '<div class="small">' + esc([s.taluk, s.hobli, s.gp, s.village].filter(String).join(' · ')) + '</div>' +
         '<div style="margin-top:6px">' + (s.caution ? chip(WORDS.caution, 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') +
+        dueChips(s) +
         chip(s.location ? 'Location saved' : 'Location not saved yet', s.location ? 'good' : 'warn') +
         chip(s.frontPhoto ? 'Front photo saved' : 'Front photo not taken yet', s.frontPhoto ? 'good' : 'warn') + '</div></button>';
     });
     setMain(h + '</div>');
     Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) {
-      b.addEventListener('click', function () { location.hash = 'vol/school/' + b.dataset.open; });
+      b.addEventListener('click', function () { openSchoolFrom(b.dataset.open); });
     });
   });
+}
+// "Last visit", "Visit due" and "Call due" (the numbers of days are in the Settings tab).
+function dueChips(s) {
+  var h = '', today = Date.parse(todayIST());
+  var days = function (d) { var t = Date.parse(d); return isNaN(t) ? null : Math.round((today - t) / 86400000); };
+  if (s.lastVisit) h += chip('Last visit ' + niceDate(s.lastVisit));
+  var since = days(s.lastVisit || s.firstVisit);
+  if (since !== null && since > (APP.settings.visitDueDays || 120)) h += chip('Visit due', 'warn');
+  var call = s.lastCall ? days(s.lastCall) : null;
+  if (call !== null && call > (APP.settings.callDueDays || 30)) h += chip('Call due', 'warn');
+  return h;
 }
 /* ===== END P5.1 ===== */
 
 /* ===== START P5.2 School page ===== */
-// One school, opened from My schools (#vol/school/12) or by the admin (#admin/school/12).
+// One school, opened from My schools (#vol/school/12) or from the other tabs (#admin/school/12, #coord/school/12).
 function screenSchool(id, backHash) {
+  var goBack = function () { location.hash = backHash; };
   setMain('<button class="btn sm back" type="button" id="back">← Back</button><p class="small">Loading the school…</p>');
-  document.getElementById('back').addEventListener('click', function () { location.hash = backHash; });
+  document.getElementById('back').addEventListener('click', goBack);
   apiCall('school', { schoolId: id }).then(function (res) {
-    if (!res.ok) { setMain('<button class="btn sm back" type="button" id="back">← Back</button><div class="msg bad">' + esc(res.error) + '</div>'); document.getElementById('back').addEventListener('click', function () { location.hash = backHash; }); return; }
-    var s = res.school; APP.school = s;
-    var given = [];
-    if (s.saplings) given.push(fmtN(s.saplings) + ' saplings');
-    if (s.seeds) given.push(fmtN(s.seeds) + ' seeds');
-    var visitOn = APP.me.role === 'Coordinator' ? /^on$/i.test(APP.settings.visitFormCoordinators) : /^on$/i.test(APP.settings.visitFormVolunteers);
+    if (!res.ok) { setMain('<button class="btn sm back" type="button" id="back">← Back</button><div class="msg bad">' + esc(res.error) + '</div>'); document.getElementById('back').addEventListener('click', goBack); return; }
+    var s = res.school; APP.school = s; APP.backTo = backHash;
     var h = '<button class="btn sm back" type="button" id="back">← Back</button>';
     h += '<h2>' + esc(s.name) + '</h2>';
     h += '<div>' + (s.caution ? chip(WORDS.caution, 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling + (s.first.notWillingReason ? ': ' + s.first.notWillingReason : ''), 'bad') : '') +
-         (s.group ? chip('Vol ' + s.groupNo) : '') + chip(s.activity || '-') + '</div>';
+         (s.group ? chip('Vol ' + s.groupNo) : '') + chip(s.activity || '-') + (s.assignedTo && s.assignedTo !== APP.me.email ? chip('With ' + (s.assignedName || s.assignedTo)) : '') + '</div>';
     h += '<div class="stack" style="margin-top:12px">';
+    if (s.canManage) h += '<div class="card" id="managebox">' + manageBox(s) + '</div>';
     h += '<div class="card first" id="firstbox">' + firstBox(s) + '</div>';
     h += '<div class="card" id="formbox">' + formBox(s) + '</div>';
     h += '<div class="card" id="callbox">' + callBox(s) + '</div>';
-    h += '<div class="card"><h3>Record your visit</h3><p class="small">' + (visitOn ? 'Comes in D3.' : WORDS.visitOff) + '</p></div>';
-    h += '<div class="card"><h3>School details</h3><dl class="kv">' +
-      kv('Taluk', s.taluk) + kv('Hobli', s.hobli) + kv('Gram panchayat (GP)', s.gp) + kv('Village', s.village) +
-      kv('Students', s.students === null ? '-' : fmtN(s.students)) + kv('UDISE code', s.udise) +
-      kv('Given in Phase 1', given.join(' + ') || '-') + kv('Date of first visit', s.firstVisit) + kv('1st visit volunteer', s.firstVol) +
-      (s.species ? '<div class="wide"><dt>Species and remarks</dt><dd class="small">' + esc(s.species) + '</dd></div>' : '') +
-      '</dl><p class="small" style="margin-top:12px">Something wrong in these details? "Update details" comes in D4.</p></div>';
+    h += '<div class="card" id="visitbox">' + visitBox(s) + '</div>';
+    h += '<div class="card" id="mediabox">' + mediaBox(s) + '</div>';
+    h += '<div class="card" id="detailsbox">' + detailsBox(s) + '</div>';
     h += '</div>';
     setMain(h);
-    document.getElementById('back').addEventListener('click', function () { location.hash = backHash; });
-    wireFirst(); wireForm(); wireCall();
+    document.getElementById('back').addEventListener('click', goBack);
+    wireFirst(); wireForm(); wireCall(); wireVisitBox(); wireMedia(); wireDetails();
+    if (s.canManage) wireManage();
   });
 }
 /* ===== END P5.2 ===== */
@@ -401,7 +474,7 @@ function wireFirst() {
     }).then(function (res) {
       if (!res.ok) { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">' + esc(res.error) + '</div>'; return; }
       toast('Front photo saved.'); route();
-    }).catch(function () { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">Upload failed. Check the internet and try again.</div>'; });
+    });
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-book]'), function (b) {
     b.addEventListener('click', function () {
@@ -428,7 +501,9 @@ function formBox(s) {
   if (s.a4 && s.a4.length) {
     h += '<p class="small" style="margin:14px 0 4px"><b>Uploaded for this school</b></p>' + s.a4.map(function (u) {
       return '<div class="list-row">' + esc(u.visitDate) + ' · ' + u.files + ' file' + (u.files === 1 ? '' : 's') + ' · ' + esc(u.by) + ' ' +
-        (u.entered ? chip('Entered by the office', 'good') : chip('Waiting for the office')) + '</div>';
+        (u.entered ? chip('Entered by the office', 'good') : chip('Waiting for the office')) +
+        (u.links && u.links.length ? ' ' + u.links.map(function (l, i) { return '<a class="link small" href="' + esc(l) + '" target="_blank" rel="noopener">File ' + (i + 1) + '</a>'; }).join(' ') : '') +
+        (APP.me.role === 'Admin' && !u.entered && u.id ? ' <button class="btn sm" type="button" data-entera4="' + esc(u.id) + '">Enter this form</button>' : '') + '</div>';
     }).join('');
   }
   return h;
@@ -458,20 +533,23 @@ function wireForm() {
         btn.disabled = false; btn.textContent = 'Upload';
         if (!res.ok) { msg.innerHTML = '<div class="msg bad" style="margin-top:10px">' + esc(res.error) + '</div>'; return; }
         toast(WORDS.formDone); route();
-      }).catch(function () {
-        btn.disabled = false; btn.textContent = 'Upload';
-        msg.innerHTML = '<div class="msg bad" style="margin-top:10px">Upload failed. Check the internet and try again.</div>';
       });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-entera4]'), function (b) {
+    b.addEventListener('click', function () {
+      var u = s.a4.filter(function (x) { return x.id === b.dataset.entera4; })[0];
+      APP.office = { a4Id: u.id, schoolId: s.id, volunteer: u.by, visitDay: '', visitDate: u.visitDate, links: u.links || [] };
+      openVisitForm(null);
+    });
   });
 }
 /* ===== END P5.4 ===== */
 
 /* ===== START P5.5 Call log ===== */
 function callBox(s) {
-  var opts = function (list) { return '<option value="">Choose…</option>' + list.map(function (x) { return '<option>' + esc(x) + '</option>'; }).join(''); };
   var h = '<h3>📞 ' + WORDS.callTitle + '</h3><div class="msg warn">' + WORDS.callHelp + '</div>' +
-    '<dl class="kv"><div><dt>Head master or principal</dt><dd>' + esc(s.hmName || '-') + phoneLine(s.hmPhone) + '</dd></div>' +
-    (s.altName || s.altPhone ? '<div><dt>Alternative contact</dt><dd>' + esc(s.altName || '-') + phoneLine(s.altPhone) + '</dd></div>' : '') + '</dl>' +
+    '<dl class="kv"><div><dt>Head master or principal</dt><dd>' + esc(s.hmName || '-') + phoneLine(s.hmPhone) + pendingPhone(s, 'hmPhone') + '</dd></div>' +
+    (s.altName || s.altPhone ? '<div><dt>Alternative contact</dt><dd>' + esc(s.altName || '-') + phoneLine(s.altPhone) + pendingPhone(s, 'altPhone') + '</dd></div>' : '') + '</dl>' +
     '<button class="btn" type="button" id="callopen" style="margin-top:12px">+ Log a call</button>' +
     '<div id="callform" hidden><div class="form">' +
     '<label>Date of the call<input type="date" id="cdate" value="' + todayIST() + '" max="' + todayIST() + '"></label>' +
@@ -489,6 +567,10 @@ function callBox(s) {
     }).join('');
   }
   return h;
+}
+function pendingPhone(s, prop) {
+  var p = s.pending && s.pending[prop];
+  return p ? '<div class="small">New number proposed (waiting for approval):</div>' + phoneLine(p.value) : '';
 }
 function wireCall() {
   var s = APP.school;
@@ -521,19 +603,20 @@ function phoneLine(num) {
 
 /* ===== START P5.6 Photo and date helpers ===== */
 // Makes a photo at most 2000 pixels on its long side (JPEG), so uploads are quick but still readable.
+// Other files (PDF, audio, video) are sent as they are.
 function shrinkFile(file) {
   return new Promise(function (ok) {
     var reader = new FileReader();
     reader.onload = function () {
-      if (/pdf/i.test(file.type)) { ok({ type: 'application/pdf', data: reader.result }); return; }
+      if (!/^image\//i.test(file.type)) { ok({ type: file.type || 'application/octet-stream', name: file.name, data: reader.result }); return; }
       var img = new Image();
       img.onload = function () {
         var max = 2000, w = img.width, h = img.height, k = Math.min(1, max / Math.max(w, h));
         var c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        ok({ type: 'image/jpeg', data: c.toDataURL('image/jpeg', 0.85) });
+        ok({ type: 'image/jpeg', name: file.name, data: c.toDataURL('image/jpeg', 0.85) });
       };
-      img.onerror = function () { ok({ type: 'image/jpeg', data: reader.result }); };
+      img.onerror = function () { ok({ type: 'image/jpeg', name: file.name, data: reader.result }); };
       img.src = reader.result;
     };
     reader.readAsDataURL(file);
@@ -542,147 +625,1000 @@ function shrinkFile(file) {
 function todayIST() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
+// "2026-11-04" -> "4 Nov 2026"
+function niceDate(d) {
+  var m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return d || '';
+  return Number(m[3]) + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(m[2]) - 1] + ' ' + m[1];
+}
 /* ===== END P5.6 ===== */
 
-/* ===== START P7.1 Volunteers list ===== */
+/* ===== START P5.7 School details and Update details ===== */
+// While a correction waits for approval, the new value is shown with "Old: ..." under it.
+function detailsBox(s) {
+  var given = [];
+  if (s.saplings) given.push(fmtN(s.saplings) + ' saplings');
+  if (s.seeds) given.push(fmtN(s.seeds) + ' seeds');
+  var P = function (label, prop, value) {
+    var p = s.pending && s.pending[prop];
+    if (!p) return kv(label, value);
+    return '<div><dt>' + esc(label) + '</dt><dd>' + esc(p.value) + ' ' + chip('waiting for approval', 'warn') + '<div class="old">Old: ' + esc(p.old || '-') + '</div></dd></div>';
+  };
+  var h = '<h3>School details</h3><dl class="kv">' +
+    P('Taluk', 'taluk', s.taluk) + P('Hobli', 'hobli', s.hobli) + P('Gram panchayat (GP)', 'gp', s.gp) + P('Village', 'village', s.village) +
+    P('Students', 'students', s.students === null ? '-' : fmtN(s.students)) + P('UDISE code', 'udise', s.udise) + P('School name', 'name', s.name) +
+    P('Saplings given (Phase 1)', 'saplings', s.saplings ? fmtN(s.saplings) : '-') + P('Seeds given (Phase 1)', 'seeds', s.seeds ? fmtN(s.seeds) : '-') +
+    kv('Date of first visit', s.firstVisit) + kv('1st visit volunteer', s.firstVol) +
+    (s.species ? '<div class="wide"><dt>Species and remarks</dt><dd class="small">' + esc(s.species) + '</dd></div>' : '') +
+    (s.pending && s.pending.saplings && s.pending.saplings.species ? '<div class="wide"><dt>Species proposed (waiting for approval)</dt><dd class="small">' + esc(s.pending.saplings.species) + '</dd></div>' : '') +
+    (s.pending && s.pending.other ? '<div class="wide"><dt>Other change proposed (waiting)</dt><dd class="small">' + esc(s.pending.other.old) + ': ' + esc(s.pending.other.value) + '</dd></div>' : '') +
+    '</dl>';
+  h += '<div class="right" style="margin-top:10px"><button class="link" type="button" id="updopen">Something wrong? Update details</button></div>';
+  h += '<div id="updform" hidden><div class="line"></div><h3>' + WORDS.updateTitle + '</h3><p class="small">' + WORDS.updateHelp + '</p>' +
+    '<div class="form"><label>What is wrong?<select id="ufield"><option value="">Choose…</option>' +
+    s.corrFields.map(function (f) { return '<option value="' + esc(f.key) + '">' + esc(f.label) + '</option>'; }).join('') + '</select></label>' +
+    '<label id="uwhatl" hidden>What is it about?<input type="text" id="uwhat" placeholder="For example: second phone number"></label>' +
+    '<label id="uvall">Correct value<input type="text" id="uval"></label></div>' +
+    '<div id="uspecies" hidden><p class="small">Enter the saplings species by species. The total is worked out for you.</p><div id="usprows"></div>' +
+    '<button class="btn sm" type="button" id="uspadd">+ Add a species</button> <span class="small" id="usptotal"></span></div>' +
+    '<div id="umsg"></div><div style="margin-top:10px"><button class="btn primary" type="button" id="usave">Send for approval</button> <button class="btn" type="button" id="ucancel">Cancel</button></div></div>';
+  return h;
+}
+function wireDetails() {
+  var s = APP.school;
+  var spRow = function () {
+    var d = document.createElement('div'); d.className = 'form'; d.style.margin = '4px 0';
+    d.innerHTML = '<label>Species<select data-sp="kind"><option value="">Choose…</option>' + s.kinds.map(function (k) { return '<option>' + esc(k) + '</option>'; }).join('') + '</select></label>' +
+      '<label>Count<input type="number" min="0" inputmode="numeric" data-sp="count"></label>';
+    document.getElementById('usprows').appendChild(d);
+    d.querySelector('[data-sp=count]').addEventListener('input', total);
+  };
+  var total = function () {
+    var t = 0; Array.prototype.forEach.call(document.querySelectorAll('[data-sp=count]'), function (i) { t += Number(i.value) || 0; });
+    document.getElementById('usptotal').textContent = 'Total: ' + t;
+  };
+  document.getElementById('updopen').addEventListener('click', function () { openUpdate(''); });
+  document.getElementById('ucancel').addEventListener('click', function () { document.getElementById('updform').hidden = true; });
+  document.getElementById('uspadd').addEventListener('click', spRow);
+  document.getElementById('ufield').addEventListener('change', function () {
+    var f = this.value;
+    document.getElementById('uwhatl').hidden = f !== 'Other';
+    document.getElementById('uspecies').hidden = f !== 'Saplings Count';
+    document.getElementById('uvall').hidden = f === 'Saplings Count';
+    if (f === 'Saplings Count' && !document.querySelector('[data-sp]')) { spRow(); spRow(); spRow(); }
+    var cur = (s.corrFields.filter(function (x) { return x.key === f; })[0] || {}).prop;
+    document.getElementById('uval').placeholder = cur && s[cur] !== null && s[cur] !== undefined ? 'Now: ' + s[cur] : '';
+  });
+  document.getElementById('usave').addEventListener('click', function () {
+    var btn = this, msg = document.getElementById('umsg'), f = document.getElementById('ufield').value;
+    if (!f) { msg.innerHTML = '<div class="msg bad">Choose what is wrong.</div>'; return; }
+    var species = [];
+    Array.prototype.forEach.call(document.querySelectorAll('#usprows .form'), function (r) {
+      var k = r.querySelector('[data-sp=kind]').value, c = r.querySelector('[data-sp=count]').value;
+      if (k && c !== '') species.push({ kind: k, count: Number(c) });
+    });
+    if (f === 'Saplings Count' && !species.length) { msg.innerHTML = '<div class="msg bad">Enter at least one species and its count.</div>'; return; }
+    if (f !== 'Saplings Count' && !document.getElementById('uval').value.trim()) { msg.innerHTML = '<div class="msg bad">Write the correct value.</div>'; return; }
+    btn.disabled = true; btn.textContent = 'Sending…';
+    apiCall('propose', { schoolId: s.id, field: f, value: document.getElementById('uval').value, what: document.getElementById('uwhat').value, species: species }).then(function (res) {
+      btn.disabled = false; btn.textContent = 'Send for approval';
+      if (!res.ok) { msg.innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
+      toast('Sent for approval. The old value stays until it is approved.');
+      route();
+    });
+  });
+}
+// Opens Update details (optionally on one field) and scrolls to it.
+function openUpdate(field) {
+  var box = document.getElementById('updform');
+  box.hidden = false;
+  if (field) { var sel = document.getElementById('ufield'); sel.value = field; sel.dispatchEvent(new Event('change')); }
+  document.getElementById('detailsbox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+/* ===== END P5.7 ===== */
+
+/* ===== START P5.8 Media (photos, audio, video) ===== */
+function mediaBox(s) {
+  var h = '<h3>🎞 ' + WORDS.mediaTitle + '</h3><p class="small">Share a photo, a voice note or a short video from the school (up to 25 MB).</p>' +
+    '<label class="btn">➕ Add photo, audio or video<input type="file" id="mfile" accept="image/*,audio/*,video/*" hidden></label>' +
+    '<div id="mpick" hidden><div class="small" id="mname" style="margin-top:8px"></div>' +
+    '<label class="f" style="margin-top:6px">What is it? (optional)<input type="text" id="mexpl" placeholder="For example: students watering the saplings"></label>' +
+    '<div id="mmsg"></div><button class="btn primary" type="button" id="msend" style="margin-top:8px">Upload</button></div>';
+  if (s.media && s.media.length) {
+    h += '<p class="small" style="margin:14px 0 4px"><b>Shared for this school</b></p>' + s.media.map(function (m) {
+      return '<div class="list-row">' + esc(m.date) + ' · ' + esc(m.kind) + ' · <a class="link" href="' + esc(m.link) + '" target="_blank" rel="noopener">Open</a>' +
+        (m.explanation ? '<div class="small">' + esc(m.explanation) + '</div>' : '') + '</div>';
+    }).join('');
+  }
+  return h;
+}
+function wireMedia() {
+  var s = APP.school, input = document.getElementById('mfile'), picked = null;
+  input.addEventListener('change', function () {
+    var f = input.files && input.files[0];
+    if (!f) return;
+    if (f.size > 25 * 1024 * 1024 && !/^image\//.test(f.type)) { toast('The file is larger than 25 MB. Please send a shorter video.'); return; }
+    document.getElementById('mpick').hidden = false;
+    document.getElementById('mname').textContent = 'Preparing ' + f.name + '…';
+    shrinkFile(f).then(function (x) { picked = x; document.getElementById('mname').textContent = f.name + ' is ready.'; });
+  });
+  document.getElementById('msend').addEventListener('click', function () {
+    var btn = this;
+    if (!picked) return;
+    btn.disabled = true; btn.textContent = 'Uploading…';
+    apiCall('saveMedia', { schoolId: s.id, data: picked.data, type: picked.type, name: picked.name, explanation: document.getElementById('mexpl').value }).then(function (res) {
+      btn.disabled = false; btn.textContent = 'Upload';
+      if (!res.ok) { document.getElementById('mmsg').innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
+      toast('Uploaded. Thank you!'); route();
+    });
+  });
+}
+/* ===== END P5.8 ===== */
+
+/* ===== START P5.9 Coordinator/admin box on the school page ===== */
+// Shown to the admin, and to a coordinator on the schools of their volunteers.
+function manageBox(s) {
+  var h = '<h3>For coordinators and the office</h3><p class="small">' +
+    (s.assignedTo ? 'With <b>' + esc(s.assignedName || s.assignedTo) + '</b> (' + esc(s.assignedTo) + ')' + (s.assignedOn ? ', since ' + esc(s.assignedOn) : '') : 'Not given to anyone yet.') + '</p>';
+  if (s.notWilling) {
+    h += '<div class="msg bad">' + WORDS.notWilling + (s.first.notWillingReason ? ': ' + esc(s.first.notWillingReason) : '') + '</div>' +
+      '<button class="btn sm" type="button" id="nwclear" style="margin-top:8px">Clear "not willing"</button>';
+  } else {
+    h += '<button class="btn sm danger" type="button" id="nwopen">Mark "School not willing to support"</button>' +
+      '<div id="nwform" hidden><label class="f" style="margin-top:8px">Reason<input type="text" id="nwwhy"></label><button class="btn sm primary" type="button" id="nwsave" style="margin-top:6px">Save</button></div>';
+  }
+  return h + '<div id="nwmsg"></div>';
+}
+function wireManage() {
+  var s = APP.school, msg = document.getElementById('nwmsg');
+  var send = function (on, reason) {
+    apiCall('setNotWilling', { schoolId: s.id, on: on, reason: reason }).then(function (res) {
+      if (!res.ok) { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">' + esc(res.error) + '</div>'; return; }
+      toast('Saved.'); route();
+    });
+  };
+  var c = document.getElementById('nwclear');
+  if (c) c.addEventListener('click', function () { send(false, ''); });
+  var o = document.getElementById('nwopen');
+  if (o) o.addEventListener('click', function () { document.getElementById('nwform').hidden = false; o.hidden = true; });
+  var sv = document.getElementById('nwsave');
+  if (sv) sv.addEventListener('click', function () {
+    var why = document.getElementById('nwwhy').value.trim();
+    if (!why) { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">Write the reason.</div>'; return; }
+    send(true, why);
+  });
+}
+/* ===== END P5.9 ===== */
+
+/* ===== START P6.1 The visit form ===== */
+// Same questions and headings as the A4 form. Only the date and "How did the visit go?" are needed.
+function visitBox(s) {
+  var h = '<h3>📝 ' + WORDS.visitTitle + '</h3>';
+  if (!s.canVisit) h += '<p class="small">' + WORDS.visitOff + '</p>';
+  else h += '<div id="vfwrap"><button class="btn primary" type="button" id="vfopen">' + (APP.me.role === 'Admin' && s.assignedTo !== APP.me.email ? 'Enter a visit (office)' : '+ Record your visit') + '</button>' +
+    (hasDraft(s.id) ? ' ' + chip('Draft saved on this phone', 'warn') : '') + '</div>';
+  h += '<div id="vhist">' + visitHistory(s) + '</div>';
+  return h;
+}
+function visitFormHtml(s) {
+  var L = s.lists, o = APP.office && String(APP.office.schoolId) === String(s.id) ? APP.office : null;
+  var sel = function (k, list) { return '<select data-k="' + k + '">' + opts(list || []) + '</select>'; };
+  var num = function (k) { return '<input type="number" min="0" inputmode="numeric" data-k="' + k + '">'; };
+  var txt = function (k, ph) { return '<input type="text" data-k="' + k + '" placeholder="' + esc(ph || '') + '">'; };
+  var ticks = function (k, list) { return '<div class="ticks">' + list.map(function (x) { return '<label><input type="checkbox" data-multi="' + k + '" value="' + esc(x) + '"> ' + esc(x) + '</label>'; }).join('') + '</div>'; };
+  var yn = ['Yes', 'No'];
+  var h = '<div id="vform">';
+  if (o) h += '<div class="msg warn">Office entry from the A4 form uploaded by ' + esc(o.volunteer) + ' (visit ' + esc(o.visitDate) + '). ' +
+    o.links.map(function (l, i) { return '<a class="link" href="' + esc(l) + '" target="_blank" rel="noopener">Open file ' + (i + 1) + '</a>'; }).join(' · ') + '</div>';
+  h += '<div id="vdraftmsg"></div>';
+  h += '<div class="form"><label>Date of the visit *<input type="date" data-k="date" max="' + todayIST() + '"></label>' +
+    '<label>How did the visit go? *' + sel('how', L['How did the visit go']) + '</label>' +
+    '<label class="wide">Who all accompanied you?' + txt('accompanied', 'Names and number of people') + '</label></div>';
+  // A
+  h += '<div class="section-h">' + WORDS.partA + '</div><p class="small">' + WORDS.partATick + '</p>' +
+    '<div class="ticks"><label><input type="checkbox" data-bool="saplingsTicked"> Saplings</label><label><input type="checkbox" data-bool="seedsTicked"> Seeds</label></div>';
+  h += '<div class="box" id="vf-sap"><h4>Saplings</h4><div class="form">' +
+    '<label>Number of saplings given' + num('sGiven') + '</label>' +
+    '<label>Were they planted?' + sel('sPlantedYN', yn) + '</label>' +
+    '<label class="wide" data-if="sWhyNot">If no, why not?' + txt('sWhyNot') + '</label></div>' +
+    '<div class="nums"><label class="f">Planted' + num('sPlanted') + '</label><label class="f">Alive now' + num('sAlive') + '</label><label class="f">Dead' + num('sDead') + '</label></div>' +
+    '<div id="vf-toomany"></div>' +
+    '<div class="form"><label>What is the health of the surviving saplings?' + sel('sHealth', L['Health']) + '</label></div>' +
+    '<label class="f">If some died, why?</label>' + ticks('sWhyDied', L['Why saplings died'] || []) +
+    '<label class="f" data-if="sWhyDiedOther">Other reason' + txt('sWhyDiedOther') + '</label>' +
+    '<div class="form"><label>Do they ask for replacement for dead plants?' + sel('sReplace', yn) + '</label>' +
+    '<label data-if="sReplaceN">If yes, how many?' + num('sReplaceN') + '</label></div></div>';
+  h += '<div class="box" id="vf-seed"><h4>Drumstick seeds</h4><div class="form">' +
+    '<label>Number of seeds given' + num('dGiven') + '</label>' +
+    '<label>Seeds sown into packets by the school?' + sel('dSown', yn) + '</label>' +
+    '<label class="wide" data-if="dWhyNot">If no, why not?' + txt('dWhyNot') + '</label>' +
+    '<label class="wide">Out of the seeds given, how many grew into saplings and were planted?' + num('dGrew') + '</label>' +
+    '<label>Health of the saplings grown from the seeds' + sel('dHealth', L['Health']) + '</label>' +
+    '<label>Where were these saplings planted?' + txt('dWhere') + '</label></div></div>';
+  h += '<div class="box" id="vf-water"><h4>Watering (all plants)</h4><div class="form">' +
+    '<label>Who waters the plants?' + sel('wWho', L['Who waters the plants']) + '</label>' +
+    '<label data-if="wWhoOther">Name or designation' + txt('wWhoOther') + '</label>' +
+    '<label data-if="wOften">How often do they water the plants?' + sel('wOften', L['How often watered']) + '</label>' +
+    '<label data-if="wSource">Where does the water for the plants come from?' + txt('wSource') + '</label></div>' +
+    '<div class="defs">' + ['Healthy', 'Fair', 'Poor'].map(function (k) { return '<div><b>' + k + ':</b> ' + esc(WORDS.health[k]) + '</div>'; }).join('') + '</div></div>';
+  // B
+  h += '<div class="section-h">' + WORDS.partB + '</div>' +
+    '<div class="act-row act-head"><span>Games or Awareness</span><span>Game or topic</span><span>Minutes</span><span>Boys</span><span>Girls</span><span>Number of teachers who joined</span><span>Grades</span></div>' +
+    '<div id="vf-acts"></div><button class="btn sm" type="button" id="vf-actadd">+ Add a row</button>';
+  // C
+  h += '<div class="section-h">' + WORDS.partC + '</div><p class="small">' + WORDS.partCTick + '</p>' + ticks('rTicks', L['Remarks ticks'] || []) +
+    '<textarea data-k="remarks" placeholder="Write the details here"></textarea>' +
+    '<div class="right"><button class="link" type="button" id="vf-olddata">' + WORDS.oldData + '</button></div>';
+  // photos and save
+  h += '<div class="line"></div><label class="btn">📷 Add visit photos (optional, up to 5)<input type="file" id="vf-photos" accept="image/*" multiple hidden></label>' +
+    '<span class="small" id="vf-pcount" style="margin-left:8px"></span><div class="thumbs" id="vf-thumbs"></div>' +
+    '<div id="vf-msg"></div><div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">' +
+    '<button class="btn primary" type="button" id="vf-save">Save visit</button><button class="btn" type="button" id="vf-close">Close</button>' +
+    '<button class="btn danger" type="button" id="vf-discard">Discard draft</button></div></div>';
+  return h;
+}
+function actRow(a) {
+  a = a || {};
+  var d = document.createElement('div'); d.className = 'act-row';
+  var L = APP.school.lists['Activity type'] || ['Games', 'Awareness'];
+  d.innerHTML = '<select data-a="type" aria-label="Games or Awareness">' + opts(L, a.type) + '</select>' +
+    '<input type="text" data-a="what" placeholder="Game or topic" value="' + esc(a.what || '') + '">' +
+    ['minutes', 'boys', 'girls', 'teachers'].map(function (k) { return '<input type="number" min="0" inputmode="numeric" data-a="' + k + '" placeholder="' + { minutes: 'Minutes', boys: 'Boys', girls: 'Girls', teachers: 'Teachers' }[k] + '" value="' + esc(a[k] || '') + '">'; }).join('') +
+    '<input type="text" data-a="grades" placeholder="Grades" value="' + esc(a.grades || '') + '">';
+  document.getElementById('vf-acts').appendChild(d);
+  d.addEventListener('input', visitChanged);
+  d.addEventListener('change', visitChanged);
+}
+/* ===== END P6.1 ===== */
+
+/* ===== START P6.2 Form behaviour, draft on the phone, saving ===== */
+// A new visit is kept on this phone while it is filled (draft), until it is saved or discarded.
+function draftKey(id) { return 'hs_draft_' + (APP.me && APP.me.email || '') + '_' + id; }
+function hasDraft(id) { try { return !!localStorage.getItem(draftKey(id)); } catch (e) { return false; } }
+function wireVisitBox() {
+  var b = document.getElementById('vfopen');
+  if (b) b.addEventListener('click', function () { openVisitForm(null); });
+  wireHistory();
+  var s = APP.school;
+  // the office came here to enter an A4 form: open the form at once
+  if (APP.office && String(APP.office.schoolId) === String(s.id) && s.canVisit) openVisitForm(null);
+}
+// edit: a visit from the history (to change it), or null for a new visit
+function openVisitForm(edit) {
+  var s = APP.school;
+  APP.editVisit = edit;
+  var wrap = document.getElementById('vfwrap');
+  if (!wrap) return;
+  wrap.innerHTML = visitFormHtml(s);
+  APP.visitPhotos = [];
+  var start = null, draft = null;
+  if (edit) start = edit.form || {};
+  else {
+    try { draft = JSON.parse(localStorage.getItem(draftKey(s.id)) || 'null'); } catch (e) { draft = null; }
+    start = draft || {
+      date: APP.office && APP.office.visitDay ? APP.office.visitDay : (APP.office ? isoFromNice(APP.office.visitDate) : todayIST()),
+      saplingsTicked: s.saplings > 0 || /sapling/i.test(s.activity), seedsTicked: s.seeds > 0 || /seed/i.test(s.activity),
+      sGiven: s.pending && s.pending.saplings ? s.pending.saplings.value : (s.saplings || ''), dGiven: s.seeds || ''
+    };
+  }
+  fillVisitForm(start);
+  document.getElementById('vdraftmsg').innerHTML = draft ? '<div class="msg warn">Your unsaved answers were brought back from this phone.</div>' :
+    edit ? '<div class="msg">Changing the visit of ' + esc(edit.date) + '.</div>' : '';
+  document.getElementById('vf-discard').hidden = !draft;
+  var form = document.getElementById('vform');
+  form.addEventListener('input', visitChanged);
+  form.addEventListener('change', visitChanged);
+  document.getElementById('vf-actadd').addEventListener('click', function () { actRow({}); });
+  document.getElementById('vf-olddata').addEventListener('click', function () { openUpdate(''); });
+  document.getElementById('vf-close').addEventListener('click', function () { APP.office = null; route(); });
+  document.getElementById('vf-discard').addEventListener('click', function () {
+    try { localStorage.removeItem(draftKey(s.id)); } catch (e) { }
+    toast('Draft discarded.'); route();
+  });
+  document.getElementById('vf-photos').addEventListener('change', function () {
+    var picked = Array.prototype.slice.call(this.files || []).slice(0, 5);
+    document.getElementById('vf-pcount').textContent = 'Preparing…';
+    Promise.all(picked.map(shrinkFile)).then(function (files) {
+      APP.visitPhotos = files;
+      document.getElementById('vf-pcount').textContent = files.length + ' photo' + (files.length === 1 ? '' : 's') + ' chosen';
+      document.getElementById('vf-thumbs').innerHTML = files.map(function (f) { return '<img src="' + f.data + '" alt="Visit photo">'; }).join('');
+    });
+  });
+  document.getElementById('vf-save').addEventListener('click', saveVisitForm);
+  visitShow();
+  document.getElementById('visitbox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function isoFromNice(t) { var d = new Date(t); return isNaN(d) ? todayIST() : d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function readVisitForm() {
+  var v = {}, f = document.getElementById('vform');
+  Array.prototype.forEach.call(f.querySelectorAll('[data-k]'), function (el) { v[el.dataset.k] = el.value; });
+  Array.prototype.forEach.call(f.querySelectorAll('[data-bool]'), function (el) { v[el.dataset.bool] = el.checked; });
+  Array.prototype.forEach.call(f.querySelectorAll('[data-multi]'), function (el) {
+    v[el.dataset.multi] = v[el.dataset.multi] || [];
+    if (el.checked) v[el.dataset.multi].push(el.value);
+  });
+  v.acts = Array.prototype.map.call(f.querySelectorAll('#vf-acts .act-row'), function (r) {
+    var a = {}; Array.prototype.forEach.call(r.querySelectorAll('[data-a]'), function (el) { a[el.dataset.a] = el.value; }); return a;
+  }).filter(function (a) { return a.what || a.minutes || a.boys || a.girls || a.teachers || a.grades; });
+  return v;
+}
+function fillVisitForm(v) {
+  var f = document.getElementById('vform');
+  Array.prototype.forEach.call(f.querySelectorAll('[data-k]'), function (el) { if (v[el.dataset.k] !== undefined && v[el.dataset.k] !== null) el.value = v[el.dataset.k]; });
+  Array.prototype.forEach.call(f.querySelectorAll('[data-bool]'), function (el) { el.checked = !!v[el.dataset.bool]; });
+  Array.prototype.forEach.call(f.querySelectorAll('[data-multi]'), function (el) { el.checked = (v[el.dataset.multi] || []).indexOf(el.value) >= 0; });
+  var acts = (v.acts && v.acts.length) ? v.acts : [{ type: 'Games' }, { type: 'Awareness' }];
+  acts.forEach(actRow);
+}
+// shows or hides questions, and the red warning when more were planted than given
+function visitShow() {
+  var v = readVisitForm(), show = function (sel, on) { Array.prototype.forEach.call(document.querySelectorAll(sel), function (el) { el.hidden = !on; }); };
+  show('#vf-sap', v.saplingsTicked); show('#vf-seed', v.seedsTicked); show('#vf-water', v.saplingsTicked || v.seedsTicked);
+  show('[data-if=sWhyNot]', v.sPlantedYN === 'No');
+  show('[data-if=sWhyDiedOther]', (v.sWhyDied || []).indexOf('Other') >= 0);
+  show('[data-if=sReplaceN]', v.sReplace === 'Yes');
+  show('[data-if=dWhyNot]', v.dSown === 'No');
+  show('[data-if=wWhoOther]', v.wWho === 'Other');
+  show('[data-if=wOften]', v.wWho !== 'Nobody'); show('[data-if=wSource]', v.wWho !== 'Nobody');
+  var too = v.sPlanted !== '' && v.sGiven !== '' && Number(v.sPlanted) > Number(v.sGiven);
+  document.getElementById('vf-sap').classList.toggle('bad', too);
+  document.getElementById('vf-toomany').innerHTML = too ? '<div class="msg bad" style="margin-top:8px">' + WORDS.plantedTooMany +
+    ' <button class="link" type="button" id="vf-fixgiven">Correct the number given</button></div>' : '';
+  var fx = document.getElementById('vf-fixgiven');
+  if (fx) fx.addEventListener('click', function () { openUpdate('Saplings Count'); });
+}
+function visitChanged() {
+  visitShow();
+  if (APP.editVisit) return;                                 // edits are not kept as drafts
+  clearTimeout(APP.draftTimer);
+  APP.draftTimer = setTimeout(function () {
+    try { localStorage.setItem(draftKey(APP.school.id), JSON.stringify(readVisitForm())); } catch (e) { }
+    var d = document.getElementById('vf-discard'); if (d) d.hidden = false;
+  }, 400);
+}
+function saveVisitForm() {
+  var s = APP.school, v = readVisitForm(), msg = document.getElementById('vf-msg'), btn = document.getElementById('vf-save');
+  if (!v.date) { msg.innerHTML = '<div class="msg bad" style="margin-top:10px">Choose the date of the visit.</div>'; return; }
+  if (!v.how) { msg.innerHTML = '<div class="msg bad" style="margin-top:10px">Choose how the visit went.</div>'; return; }
+  btn.disabled = true; btn.textContent = 'Saving…';
+  var o = APP.office && String(APP.office.schoolId) === String(s.id) ? APP.office : null;
+  apiCall('saveVisit', { schoolId: s.id, v: v, photos: APP.visitPhotos || [], visitId: APP.editVisit ? APP.editVisit.id : '',
+                         a4Id: o ? o.a4Id : '', volunteer: o ? o.volunteer : '' }).then(function (res) {
+    btn.disabled = false; btn.textContent = 'Save visit';
+    if (!res.ok) { msg.innerHTML = '<div class="msg bad" style="margin-top:10px">' + esc(res.error) + '</div>'; return; }
+    if (!APP.editVisit) { try { localStorage.removeItem(draftKey(s.id)); } catch (e) { } }
+    toast(o ? 'Visit entered and the A4 form marked as entered.' : 'Visit saved. Thank you!');
+    var back = o && o.fromList;
+    APP.office = null; APP.editVisit = null;
+    if (back) location.hash = 'admin/a4'; else route();
+  });
+}
+/* ===== END P6.2 ===== */
+
+/* ===== START P6.3 Visit history ===== */
+function visitHistory(s) {
+  var list = s.visitsList || [];
+  if (!list.length) return '<p class="small" style="margin-top:10px">No visits recorded in the app yet.</p>';
+  return '<p class="small" style="margin:14px 0 4px"><b>Visits recorded</b></p>' + list.map(function (v, i) {
+    var nums = [];
+    if (v.given !== null || v.planted !== null) nums.push('Saplings: given ' + fmtN(v.given) + ', planted ' + fmtN(v.planted) + ', alive ' + fmtN(v.alive));
+    if (v.seedsGrew !== null) nums.push('Seeds: ' + fmtN(v.seedsGiven) + ' given, ' + fmtN(v.seedsGrew) + ' grew and planted');
+    return '<div class="list-row"><b>' + esc(v.date) + '</b> · ' + esc(v.how) + ' · ' + esc(v.volunteer) + ' ' + chip(v.source === 'Self' ? 'Recorded by the volunteer' : v.source + ' (' + v.enteredBy + ')') +
+      (nums.length ? '<div class="small">' + esc(nums.join(' · ')) + (v.health ? ' · ' + esc(v.health) : '') + '</div>' : '') +
+      (v.activities ? '<div class="small" style="white-space:pre-line">' + esc(v.activities) + '</div>' : '') +
+      (v.ticks ? '<div>' + v.ticks.split(/,\s*/).map(function (t) { return chip(t, /concern|pit|not willing/i.test(t) ? 'warn' : ''); }).join('') + '</div>' : '') +
+      (v.remarks ? '<div class="small">' + esc(v.remarks) + '</div>' : '') +
+      (v.photos ? '<div class="small">' + v.photos + ' photo' + (v.photos === 1 ? '' : 's') + ' saved</div>' : '') +
+      (v.canEdit && APP.school.canVisit ? '<div style="margin-top:6px"><button class="btn sm" type="button" data-vedit="' + i + '">Change</button> <button class="btn sm danger" type="button" data-vdel="' + esc(v.id) + '">Delete</button></div>' : '') + '</div>';
+  }).join('');
+}
+function wireHistory() {
+  var s = APP.school;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-vedit]'), function (b) {
+    b.addEventListener('click', function () { openVisitForm(s.visitsList[Number(b.dataset.vedit)]); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-vdel]'), function (b) {
+    b.addEventListener('click', function () {
+      if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Tap again to delete'; return; }
+      apiCall('deleteVisit', { visitId: b.dataset.vdel }).then(function (res) {
+        if (!res.ok) { toast(res.error); return; }
+        toast('Visit deleted.'); route();
+      });
+    });
+  });
+}
+/* ===== END P6.3 ===== */
+
+/* ===== START P7.1 Volunteers list (with remarks and changes) ===== */
 // Admin sees everybody; a coordinator sees only their own volunteers.
+// Tap a person: their schools, private remarks (never shown to volunteers) and, for the admin, changes.
 function screenVolunteers() {
   var isAdmin = APP.me.role === 'Admin';
-  setMain(subTabs() + '<h2>' + (isAdmin ? 'All people in the Vol tab' : 'Your volunteers') + '</h2><p class="small">Loading…</p>');
+  var title = isAdmin ? 'All people in the Vol tab' : 'Your volunteers';
+  setMain(subTabs() + '<div id="alertsbox"></div><div id="vwrap"><h2>' + title + '</h2><p class="small">Loading…</p></div>');
+  wireSubTabs();
+  if (!isAdmin) alertsBlock('alertsbox');
   apiCall('volunteers').then(function (res) {
-    if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); return; }
+    var wrap = document.getElementById('vwrap');
+    if (!wrap) return;
+    if (!res.ok) { wrap.innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
     APP.vols = res.volunteers || [];
-    var h = subTabs() + '<h2>' + (isAdmin ? 'All people in the Vol tab' : 'Your volunteers') + '</h2>';
-    h += '<div class="filters"><input type="search" id="vq" placeholder="Search name, email, centre or area" style="min-width:260px">' +
+    APP.picked = {};
+    var h = '<h2>' + title + '</h2>';
+    h += '<div class="filters"><input type="search" id="vq" placeholder="Search name, email, centre or area" style="min-width:240px">' +
          '<select id="vshow"><option value="">Everyone</option><option value="none">No schools yet</option><option value="with">With schools</option>' +
-         (isAdmin ? '<option value="check">Email to check</option><option value="inactive">Inactive</option>' : '') + '</select>' +
+         (isAdmin ? '<option value="nocoord">No coordinator</option><option value="check">Email to check</option><option value="inactive">Inactive</option><option value="coords">Coordinators and admins</option>' : '') + '</select>' +
          (isAdmin ? '<button class="btn sm" id="vrefresh" type="button">Refresh volunteers from the sign-up form</button>' : '') + '</div>';
+    if (isAdmin) h += '<div class="bar" id="vbulk"><span class="small" id="vbcount">0 chosen</span>' +
+      '<select id="vbcoord"><option value="">Give to coordinator…</option>' + coordOptions() + '</select>' +
+      '<button class="btn sm primary" type="button" id="vbgive">Give</button><button class="btn sm" type="button" id="vbremove">Remove coordinator</button></div>';
     h += '<div id="vlist"></div>';
-    setMain(h); wireSubTabs();
+    wrap.innerHTML = h;
     document.getElementById('vq').addEventListener('input', drawVolunteers);
     document.getElementById('vshow').addEventListener('change', drawVolunteers);
-    if (isAdmin) document.getElementById('vrefresh').addEventListener('click', function (ev) {
-      ev.target.disabled = true; ev.target.textContent = 'Refreshing…';
-      apiCall('refreshVolunteers').then(function (r) { toast(r.ok ? r.added + ' new volunteer(s) added.' : r.error); route(); });
-    });
+    if (isAdmin) {
+      document.getElementById('vrefresh').addEventListener('click', function (ev) {
+        ev.target.disabled = true; ev.target.textContent = 'Refreshing…';
+        apiCall('refreshVolunteers').then(function (r) { toast(r.ok ? r.added + ' new volunteer(s) added.' : r.error); route(); });
+      });
+      var bulk = function (coord) {
+        var emails = Object.keys(APP.picked).filter(function (k) { return APP.picked[k]; });
+        if (!emails.length) { toast('Tick at least one person first.'); return; }
+        apiCall('savePeople', { emails: emails, set: { coordinator: coord } }).then(function (r) { toast(r.ok ? r.changed + ' changed.' : r.error); if (r.ok) route(); });
+      };
+      document.getElementById('vbgive').addEventListener('click', function () {
+        var c = document.getElementById('vbcoord').value;
+        if (!c) { toast('Choose the coordinator.'); return; }
+        bulk(c);
+      });
+      document.getElementById('vbremove').addEventListener('click', function () { bulk(''); });
+    }
     drawVolunteers();
   });
 }
+function coordOptions(cur) {
+  return (APP.vols || []).filter(function (v) { return /^coord/i.test(v.role) && /^active$/i.test(v.status); })
+    .map(function (v) { return '<option value="' + esc(v.email) + '"' + (cur === v.email ? ' selected' : '') + '>' + esc(v.name) + '</option>'; }).join('');
+}
 function drawVolunteers() {
+  var isAdmin = APP.me.role === 'Admin';
   var q = (document.getElementById('vq').value || '').toLowerCase(), show = document.getElementById('vshow').value;
   var list = APP.vols.filter(function (v) {
     if (show === 'none' && v.schools) return false;
     if (show === 'with' && !v.schools) return false;
     if (show === 'check' && !/check/i.test(v.note)) return false;
     if (show === 'inactive' && /^active$/i.test(v.status)) return false;
-    return !q || (v.name + ' ' + v.email + ' ' + v.centre + ' ' + v.area).toLowerCase().indexOf(q) >= 0;
+    if (show === 'nocoord' && (v.coordinator || !/^vol/i.test(v.role))) return false;
+    if (show === 'coords' && /^vol/i.test(v.role)) return false;
+    return !q || (v.name + ' ' + v.email + ' ' + v.centre + ' ' + v.area + ' ' + v.coordinatorName).toLowerCase().indexOf(q) >= 0;
   });
-  var h = '<p class="small">' + list.length + ' shown</p><div class="tbl-wrap"><table><thead><tr><th>#</th><th>Name</th><th>Role · Status</th><th>Phone</th><th>Centre</th><th class="n">Wants</th><th class="n">Schools allotted</th><th>Preferred area</th></tr></thead><tbody>';
+  var cols = isAdmin ? 10 : 9;
+  var h = '<p class="small">' + list.length + ' shown. Tap a person to see their schools' + (isAdmin ? ', remarks and changes' : ' and remarks') + '.</p><div class="tbl-wrap"><table><thead><tr>' +
+    (isAdmin ? '<th><input type="checkbox" id="vall" aria-label="Choose all shown"></th>' : '') +
+    '<th>#</th><th>Name</th><th>Role · Status</th><th>Phone</th><th>Centre</th><th class="n">Wants</th><th class="n">Schools allotted</th><th class="n">Schools visited</th><th>' + (isAdmin ? 'Coordinator' : 'Preferred area') + '</th></tr></thead><tbody>';
   list.forEach(function (v, i) {
-    h += '<tr><td>' + (i + 1) + '</td><td><b>' + esc(v.name) + '</b><div class="small">' + esc(v.email) + '</div>' + (v.note ? chip(v.note, /check/i.test(v.note) ? 'warn' : '') : '') +
-      (v.schoolNames && v.schoolNames.length ? '<div class="small">' + esc(v.schoolNames.join(' · ')) + '</div>' : '') + '</td>' +
+    var open = APP.openVol === v.email;
+    var recent = v.remarks.some(function (r) { return r.recent; });
+    h += '<tr class="click" data-vol="' + esc(v.email) + '">' + (isAdmin ? '<td><input type="checkbox" data-pick="' + esc(v.email) + '"' + (APP.picked[v.email] ? ' checked' : '') + ' aria-label="Choose"></td>' : '') +
+      '<td>' + (i + 1) + '</td><td><b>' + (open ? '▾ ' : '▸ ') + esc(v.name) + '</b><div class="small">' + esc(v.email) + '</div>' + (v.note ? chip(v.note, /check/i.test(v.note) ? 'warn' : '') : '') +
+      (v.remarks.length ? chip(v.remarks.length + ' remark' + (v.remarks.length === 1 ? '' : 's') + (recent ? ' · recent' : ''), recent ? 'warn' : '') : '') + '</td>' +
       '<td>' + esc(v.role) + '<br>' + chip(v.status, /^active$/i.test(v.status) ? 'good' : 'bad') + '</td>' +
       '<td>' + esc(v.phone || '-') + '</td><td>' + esc(v.centre || '-') + '</td><td class="n">' + esc(v.wants || '-') + '</td>' +
-      '<td class="n"><b>' + v.schools + '</b></td><td>' + esc(v.area || '-') + '</td></tr>';
+      '<td class="n"><b>' + v.schools + '</b></td><td class="n">' + v.visited + '</td><td>' + esc(isAdmin ? (v.coordinatorName || '-') : (v.area || '-')) + '</td></tr>';
+    if (open) h += '<tr><td colspan="' + cols + '">' + personPanel(v) + '</td></tr>';
   });
   document.getElementById('vlist').innerHTML = h + '</tbody></table></div>';
+  Array.prototype.forEach.call(document.querySelectorAll('#vlist [data-vol]'), function (tr) {
+    tr.addEventListener('click', function (ev) {
+      if (ev.target.matches('input')) return;
+      APP.openVol = APP.openVol === tr.dataset.vol ? '' : tr.dataset.vol; drawVolunteers();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#vlist [data-pick]'), function (c) {
+    c.addEventListener('change', function () { APP.picked[c.dataset.pick] = c.checked; countPicked(); });
+  });
+  var all = document.getElementById('vall');
+  if (all) all.addEventListener('change', function () {
+    list.forEach(function (v) { APP.picked[v.email] = all.checked; });
+    drawVolunteers();
+  });
+  if (isAdmin) countPicked();
+  Array.prototype.forEach.call(document.querySelectorAll('#vlist [data-school]'), function (b) {
+    b.addEventListener('click', function () { openSchoolFrom(b.dataset.school); });
+  });
+  wirePersonPanel();
+}
+function countPicked() {
+  var n = Object.keys(APP.picked).filter(function (k) { return APP.picked[k]; }).length;
+  var c = document.getElementById('vbcount'); if (c) c.textContent = n + ' chosen';
+}
+function personPanel(v) {
+  var isAdmin = APP.me.role === 'Admin';
+  var h = '<div class="small" style="margin-bottom:4px">' + esc([v.area ? 'Preferred area: ' + v.area : '', v.coordinatorName ? 'Coordinator: ' + v.coordinatorName : ''].filter(String).join(' · ')) + '</div>';
+  h += '<h4>Schools</h4>' + (v.schoolList && v.schoolList.length ? v.schoolList.map(function (s, k) {
+    return '<div class="list-row"><button class="link" type="button" data-school="' + s.id + '">' + (k + 1) + '. ' + esc(s.name) + '</button>' +
+      ' <span class="small">' + esc([s.village, s.taluk].filter(String).join(' · ')) + '</span>' + (s.lastVisit ? ' ' + chip('Visited ' + niceDate(s.lastVisit), 'good') : '') +
+      (s.caution ? ' ' + chip('Not ready or merged', 'warn') : '') + (s.notWilling ? ' ' + chip(WORDS.notWilling, 'bad') : '') + '</div>';
+  }).join('') : '<span class="small">No schools yet.</span>');
+  h += '<h4>Private remarks <span class="small">(only coordinators and the office see these)</span></h4>' +
+    (v.remarks.length ? v.remarks.map(function (r) {
+      return '<div class="list-row">' + chip(r.kind, r.kind === 'Positive' ? 'good' : r.kind === 'Concern' ? 'bad' : '') + (r.recent ? chip('Recent', 'warn') : '') +
+        esc(r.remark) + '<div class="small">' + (r.about ? 'About ' + esc(r.about) + ' · ' : '') + 'written ' + esc(r.on) + ' by ' + esc(r.by) + '</div></div>';
+    }).join('') : '<p class="small">No remarks yet.</p>');
+  h += '<div class="form"><label>Kind<select id="rk">' + opts(['Positive', 'Concern', 'Other'], 'Positive') + '</select></label>' +
+    '<label>About which day (optional)<input type="date" id="rd" max="' + todayIST() + '"></label>' +
+    '<label class="wide">Remark<textarea id="rt"></textarea></label></div><button class="btn sm primary" type="button" id="rsave" data-for="' + esc(v.email) + '">Save remark</button>';
+  if (isAdmin) {
+    h += '<h4>Change this person</h4><div class="form">' +
+      '<label>Login email (what sign-in checks)<input type="email" id="pe" value="' + esc(v.email) + '"></label>' +
+      '<label>Role<select id="pr">' + opts(['Volunteer', 'Coordinator', 'Admin'], v.role) + '</select></label>' +
+      '<label>Status<select id="ps">' + opts(['Active', 'Inactive'], v.status) + '</select></label>' +
+      '<label>Coordinator<select id="pc"><option value="">No coordinator</option>' + coordOptions(v.coordinator) + '</select></label></div>' +
+      '<p class="small">Sign-up email: ' + esc(v.signupEmail || '-') + '. Changing the login email also moves the person\'s schools.</p>' +
+      '<button class="btn sm primary" type="button" id="psave" data-for="' + esc(v.email) + '">Save changes</button>';
+  }
+  return h + '<div id="pmsg"></div>';
+}
+function wirePersonPanel() {
+  var rs = document.getElementById('rsave');
+  if (rs) rs.addEventListener('click', function () {
+    var text = document.getElementById('rt').value.trim();
+    if (!text) { document.getElementById('pmsg').innerHTML = '<div class="msg bad">Write the remark.</div>'; return; }
+    apiCall('addRemark', { volunteer: rs.dataset.for, kind: document.getElementById('rk').value, aboutDate: document.getElementById('rd').value, remark: text }).then(function (r) {
+      if (!r.ok) { document.getElementById('pmsg').innerHTML = '<div class="msg bad">' + esc(r.error) + '</div>'; return; }
+      toast('Remark saved.'); route();
+    });
+  });
+  var ps = document.getElementById('psave');
+  if (ps) ps.addEventListener('click', function () {
+    var v = APP.vols.filter(function (x) { return x.email === ps.dataset.for; })[0], set = {};
+    var e = document.getElementById('pe').value.trim().toLowerCase();
+    if (e !== v.email) set.loginEmail = e;
+    if (document.getElementById('pr').value !== v.role) set.role = document.getElementById('pr').value;
+    if (document.getElementById('ps').value !== v.status) set.status = document.getElementById('ps').value;
+    if (document.getElementById('pc').value !== (v.coordinator || '')) set.coordinator = document.getElementById('pc').value;
+    if (!Object.keys(set).length) { toast('Nothing changed.'); return; }
+    apiCall('savePeople', { emails: [v.email], set: set }).then(function (r) {
+      if (!r.ok) { document.getElementById('pmsg').innerHTML = '<div class="msg bad">' + esc(r.error) + '</div>'; return; }
+      if (set.loginEmail) APP.openVol = set.loginEmail;
+      toast('Saved.'); route();
+    });
+  });
 }
 /* ===== END P7.1 ===== */
 
-/* ===== START P7.2 Admin dashboard ===== */
+/* ===== START P7.2 Admin dashboard (alerts, numbers, switches) ===== */
+// Sapling numbers come from each school's latest visit (saplings only); seeds are shown apart.
+var DASH = { taluk: '', hobli: '' };
 function screenDashboard() {
-  setMain(subTabs() + '<h2>Dashboard</h2><p class="small">Loading…</p>');
-  apiCall('overview').then(function (res) {
-    if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); return; }
-    var o = res.overview;
-    var t = function (n, l) { return '<div class="tile"><div class="n">' + fmtN(n) + '</div><div class="l">' + l + '</div></div>'; };
-    setMain(subTabs() + '<h2>Dashboard</h2><div class="grid-tiles">' +
-      t(o.schools, 'schools in all') + t(o.grouped, 'in ' + fmtN(o.groups) + ' groups') + t(o.caution, 'not ready or merged') +
-      t(o.assigned, 'schools assigned') + t(o.groupsFree, 'groups with no volunteer yet') +
-      t(o.volunteersActive, 'active volunteers') + t(o.coordinatorsActive, 'active coordinators') + t(o.adminsActive, 'active admins') +
-      t(o.inactive, 'inactive in the Vol tab') + t(o.emailChecks, 'emails to check') +
-      '</div><p class="small" style="margin-top:14px">Visit and survival numbers come in D5.</p>');
-    wireSubTabs();
+  setMain(subTabs() + '<div id="alertsbox"></div><h2>Dashboard</h2><div id="dash"><p class="small">Loading…</p></div>');
+  wireSubTabs();
+  alertsBlock('alertsbox');
+  loadDashboard();
+}
+function loadDashboard() {
+  apiCall('dashboard', { filters: DASH }).then(function (res) {
+    var box = document.getElementById('dash');
+    if (!box) return;
+    if (!res.ok) { box.innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
+    var d = res.dashboard, t = d.total, o = res.overview;
+    var pct = function (a, b) { return b ? Math.round(a * 100 / b) + '%' : '-'; };
+    var tile = function (n, l, s) { return '<div class="tile"><div class="n">' + n + '</div><div class="l">' + l + '</div>' + (s ? '<div class="s">' + s + '</div>' : '') + '</div>'; };
+    var place = DASH.hobli ? DASH.taluk + ' · ' + DASH.hobli : DASH.taluk || 'All taluks';
+    var h = '<div class="crumbs"><b>' + esc(place) + '</b>' + (DASH.taluk ? ' <button class="link" type="button" id="dup">↑ Up one level</button>' : '') + '</div>';
+    h += '<div class="grid-tiles">' +
+      tile(fmtN(t.adopted), 'schools adopted', 'of ' + fmtN(t.schools)) +
+      tile(fmtN(t.visited), 'schools visited', pct(t.visited, t.adopted) + ' of adopted') +
+      tile(fmtN(t.planted), 'saplings planted', 'of ' + fmtN(t.given) + ' given (' + pct(t.planted, t.given) + ')') +
+      tile(fmtN(t.alive), 'saplings alive', 'of ' + fmtN(t.planted) + ' planted') +
+      tile(pct(t.alive, t.planted), 'survival: alive ÷ planted') +
+      tile(pct(t.alive, t.given), 'survival: alive ÷ given') +
+      tile(fmtN(t.seedsGrew), 'seeds grew and were planted', 'of ' + fmtN(t.seedsGiven) + ' seeds given') +
+      tile(fmtN(t.notWilling), 'not willing to support') +
+      '</div>';
+    h += '<p class="small" style="margin-top:6px">Saplings and survival use each school\'s latest visit where saplings were ticked. A correction waiting for approval counts at once.</p>';
+    h += '<div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th>' + { taluk: 'Taluk', hobli: 'Hobli', gp: 'Gram panchayat' }[d.level] + '</th>' +
+      '<th class="n">Schools</th><th class="n">Adopted</th><th class="n">Visited</th><th class="n">Given</th><th class="n">Planted</th><th class="n">Alive</th><th class="n">Alive ÷ planted</th><th class="n">Alive ÷ given</th><th class="n">Seeds grew</th></tr></thead><tbody>';
+    d.rows.forEach(function (r) {
+      h += '<tr' + (d.level !== 'gp' ? ' class="click" data-drill="' + esc(r.name) + '"' : '') + '><td>' + (d.level !== 'gp' ? '▸ ' : '') + esc(r.name) + '</td><td class="n">' + fmtN(r.schools) + '</td><td class="n">' + fmtN(r.adopted) + '</td><td class="n">' + fmtN(r.visited) +
+        '</td><td class="n">' + fmtN(r.given) + '</td><td class="n">' + fmtN(r.planted) + '</td><td class="n">' + fmtN(r.alive) + '</td><td class="n">' + pct(r.alive, r.planted) + '</td><td class="n">' + pct(r.alive, r.given) + '</td><td class="n">' + fmtN(r.seedsGrew) + '</td></tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<h3 style="margin-top:18px">People and work</h3><div class="grid-tiles">' +
+      tile(fmtN(d.volunteersWithSchools), 'active people with schools') + tile(fmtN(o.volunteersActive), 'active volunteers') +
+      tile(fmtN(o.coordinatorsActive), 'active coordinators') + tile(fmtN(o.adminsActive), 'active admins') +
+      tile(fmtN(d.a4Waiting), 'A4 forms waiting for the office') + tile(fmtN(d.correctionsWaiting), 'corrections waiting') +
+      tile(fmtN(o.groupsFree), 'groups with no volunteer yet', 'of ' + fmtN(o.groups)) + tile(fmtN(o.caution), 'not ready or merged') +
+      tile(fmtN(o.inactive), 'inactive in the Vol tab') + tile(fmtN(o.emailChecks), 'emails to check') + '</div>';
+    h += '<h3 style="margin-top:18px">Switches</h3><div class="card"><p class="small">Changes take effect the next time a person opens the app.</p>' +
+      [['VISIT_FORM_VOLUNTEERS', 'Record your visit for volunteers'], ['VISIT_FORM_COORDINATORS', 'Record your visit for coordinators (their own schools)'],
+       ['MAP_VOLUNTEERS', 'Map tab for volunteers'], ['MAP_COORDINATORS', 'Map tab for coordinators']].map(function (k) {
+        var on = res.switches[k[0]] === 'On';
+        return '<div class="list-row" style="display:flex;justify-content:space-between;gap:10px;align-items:center"><span>' + esc(k[1]) + '</span>' +
+          '<button class="btn sm' + (on ? ' primary' : '') + '" type="button" data-switch="' + k[0] + '" data-to="' + (on ? 'Off' : 'On') + '">' + (on ? 'On' : 'Off') + '</button></div>';
+      }).join('') + '<p class="small" style="margin-top:8px">The admin and the office can always enter visits.</p></div>';
+    box.innerHTML = h;
+    var up = document.getElementById('dup');
+    if (up) up.addEventListener('click', function () { if (DASH.hobli) DASH.hobli = ''; else DASH.taluk = ''; box.innerHTML = '<p class="small">Loading…</p>'; loadDashboard(); });
+    Array.prototype.forEach.call(box.querySelectorAll('[data-drill]'), function (tr) {
+      tr.addEventListener('click', function () { if (!DASH.taluk) DASH.taluk = tr.dataset.drill; else DASH.hobli = tr.dataset.drill; box.innerHTML = '<p class="small">Loading…</p>'; loadDashboard(); });
+    });
+    Array.prototype.forEach.call(box.querySelectorAll('[data-switch]'), function (b) {
+      b.addEventListener('click', function () {
+        b.disabled = true;
+        apiCall('setSwitch', { key: b.dataset.switch, value: b.dataset.to }).then(function (r) {
+          if (!r.ok) { toast(r.error); b.disabled = false; return; }
+          APP.settings[{ VISIT_FORM_VOLUNTEERS: 'visitFormVolunteers', VISIT_FORM_COORDINATORS: 'visitFormCoordinators', MAP_VOLUNTEERS: 'mapVolunteers', MAP_COORDINATORS: 'mapCoordinators' }[b.dataset.switch]] = b.dataset.to;
+          toast('Switched ' + b.dataset.to + '.'); loadDashboard();
+        });
+      });
+    });
   });
 }
 /* ===== END P7.2 ===== */
 
-/* ===== START P7.3 Admin: schools (assignments come in D2) ===== */
+/* ===== START P7.3 Assignments (by group or one by one) ===== */
+// Admin: any school to anyone. Coordinator: free schools to their own volunteers (or themselves).
+// The number a person wished for is only a guide: going above it shows a note, never a block.
 var FIND = { taluk: '', hobli: '', gp: '', q: '', show: '' };
+var GRP = { taluk: '', show: 'free', q: '', limit: 25 };
 function screenAssign() {
-  setMain(subTabs() + '<h2>Assignments</h2><div class="msg warn" style="margin-bottom:12px">Giving schools to volunteers from here comes in D2. For now, find and open any school.</div><div class="filters" id="ff"></div><div id="flist"><p class="small">Loading…</p></div>');
+  var isAdmin = APP.me.role === 'Admin';
+  if (!isAdmin && !FIND.show) FIND.show = 'free';
+  APP.assignMode = APP.assignMode || 'groups';
+  setMain(subTabs() + '<h2>Assignments</h2><div id="apick"><p class="small">Loading people…</p></div>' +
+    '<div class="subtabs" style="margin-top:8px"><button type="button" data-mode="groups" aria-selected="' + (APP.assignMode === 'groups') + '">By group (Vol 1, Vol 2 …)</button>' +
+    '<button type="button" data-mode="one" aria-selected="' + (APP.assignMode === 'one') + '">One by one</button></div>' +
+    '<div class="filters" id="ff"></div><div id="flist"><p class="small">Loading…</p></div>');
   wireSubTabs();
-  runFind();
+  Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'), function (b) {
+    b.addEventListener('click', function () { APP.assignMode = b.dataset.mode; route(); });
+  });
+  apiCall('volunteers').then(function (res) {
+    APP.vols = res.ok ? res.volunteers : [];
+    var people = APP.vols.filter(function (v) { return /^active$/i.test(v.status); });
+    if (!isAdmin && !people.some(function (v) { return v.email === APP.me.email; })) people.unshift({ email: APP.me.email, name: APP.me.name + ' (me)', schools: (APP.myCount || 0), wants: '' });
+    APP.people = people;
+    document.getElementById('apick').innerHTML = '<div class="bar"><label class="f" style="flex:1;min-width:220px">Give schools to<select id="ato"><option value="">Choose the person…</option>' +
+      people.map(function (v) { return '<option value="' + esc(v.email) + '"' + (APP.giveTo === v.email ? ' selected' : '') + '>' + esc(v.name) + ' · has ' + v.schools + (v.wants ? ', wants ' + esc(v.wants) : '') + '</option>'; }).join('') +
+      '</select></label><input type="search" id="aq" placeholder="Find a person" style="max-width:200px"></div><div id="anote"></div>';
+    var sel = document.getElementById('ato');
+    sel.addEventListener('change', function () { APP.giveTo = sel.value; personNote(0); });
+    document.getElementById('aq').addEventListener('input', function () {
+      var q = this.value.toLowerCase();
+      Array.prototype.forEach.call(sel.options, function (o, i) { if (i) o.hidden = q && o.textContent.toLowerCase().indexOf(q) < 0; });
+    });
+    personNote(0);
+  });
+  if (APP.assignMode === 'groups') runGroups(); else runFind();
+}
+// the soft note: "will have N schools (wished M)"
+function personNote(adding) {
+  var box = document.getElementById('anote'); if (!box) return;
+  var p = (APP.people || []).filter(function (v) { return v.email === APP.giveTo; })[0];
+  if (!p) { box.innerHTML = ''; return; }
+  var after = p.schools + (adding || 0), wants = Number(p.wants) || Number(APP.settings.schoolsGuide) || 3;
+  box.innerHTML = '<p class="small">' + esc(p.name) + ' has ' + p.schools + ' school' + (p.schools === 1 ? '' : 's') + (p.wants ? ' and wished for ' + esc(p.wants) : '') + '.' +
+    (adding && after > wants ? ' <span class="chip warn">After this: ' + after + ' schools, more than ' + wants + '. This is allowed.</span>' : '') + '</p>';
+}
+function giveSchools(ids, done) {
+  if (!APP.giveTo) { toast('First choose the person at the top.'); return; }
+  personNote(ids.length);
+  apiCall('assign', { to: APP.giveTo, schoolIds: ids }).then(function (r) {
+    if (!r.ok) { toast(r.error); return; }
+    toast(r.given + ' school' + (r.given === 1 ? '' : 's') + ' given.' + (r.skipped.length ? ' Not given: ' + r.skipped.join('; ') : ''));
+    (APP.people || []).forEach(function (v) { if (v.email === APP.giveTo) v.schools += r.given; });
+    personNote(0);
+    done();
+  });
+}
+function takeBackSchools(ids, done) {
+  apiCall('takeBack', { schoolIds: ids }).then(function (r) {
+    if (!r.ok) { toast(r.error); return; }
+    toast(r.taken + ' school' + (r.taken === 1 ? '' : 's') + ' taken back.' + (r.skipped.length ? ' Skipped: ' + r.skipped.join('; ') : ''));
+    done();
+  });
+}
+function runGroups() {
+  apiCall('groups', { filters: GRP }).then(function (res) {
+    var ff = document.getElementById('ff'), fl = document.getElementById('flist');
+    if (!ff) return;
+    if (!res.ok) { fl.innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
+    ff.innerHTML = '<select data-g="taluk"><option value="">All taluks</option>' + res.taluks.map(function (t) { return '<option' + (t === GRP.taluk ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' +
+      '<select data-g="show">' + [['free', 'Free groups'], ['partly', 'Partly given'], ['given', 'Fully given'], ['all', 'All groups']].map(function (x) { return '<option value="' + x[0] + '"' + (GRP.show === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>' +
+      '<input type="search" data-g="q" placeholder="Vol number, school or village" value="' + esc(GRP.q) + '" style="min-width:220px">';
+    Array.prototype.forEach.call(ff.querySelectorAll('[data-g]'), function (el) {
+      el.addEventListener('change', function () { GRP[el.dataset.g] = el.value; GRP.limit = 25; fl.innerHTML = '<p class="small">Loading…</p>'; runGroups(); });
+    });
+    var h = '<p class="small">' + fmtN(res.total) + ' group' + (res.total === 1 ? '' : 's') + (res.total > res.groups.length ? ', first ' + res.groups.length + ' shown' : '') +
+      '. Groups are in the Sheet order: Vol 1 has the biggest planting. The taluk is the first school\'s.</p>';
+    res.groups.forEach(function (g) {
+      var free = g.schools.filter(function (s) { return !s.assignedTo; }).map(function (s) { return s.id; });
+      var back = g.schools.filter(function (s) { return s.assignedTo && (APP.me.role === 'Admin' || s.mine); }).map(function (s) { return s.id; });
+      h += '<div class="group ' + g.state + '"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>Vol ' + g.no + ' · ' + esc(g.taluk) + '</b>' +
+        '<span class="small">' + fmtN(g.saplings) + ' saplings' + (g.seeds ? ' + ' + fmtN(g.seeds) + ' seeds' : '') + ' · ' + { free: 'Free', partly: 'Partly given', given: 'Given' }[g.state] + '</span></div>';
+      g.schools.forEach(function (s, i) {
+        h += '<div class="list-row"><span class="sl">' + (i + 1) + '.</span><button class="link" type="button" data-open="' + s.id + '">' + esc(s.name) + '</button> ' +
+          '<span class="small">' + esc([s.village, s.gp, s.hobli, s.taluk].filter(String).join(' · ')) + ' · ' + esc(s.activity) + '</span> ' +
+          (s.assignedTo ? chip(s.assignedTo === 'Taken' ? 'Taken' : 'With ' + s.assignedTo, 'good') : chip('Free')) + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') + (s.caution ? chip('Not ready or merged', 'warn') : '') + '</div>';
+      });
+      h += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +
+        (free.length ? '<button class="btn sm primary" type="button" data-give="' + free.join(',') + '">Give ' + (free.length === g.schools.length ? 'this group' : 'the ' + free.length + ' free school' + (free.length === 1 ? '' : 's')) + '</button>' : '') +
+        (back.length ? '<button class="btn sm" type="button" data-back="' + back.join(',') + '">Take back ' + back.length + '</button>' : '') + '</div></div>';
+    });
+    if (res.total > res.groups.length) h += '<button class="btn" type="button" id="gmore">Show 25 more groups</button>';
+    fl.innerHTML = h;
+    var more = document.getElementById('gmore');
+    if (more) more.addEventListener('click', function () { GRP.limit = res.groups.length + 25; more.disabled = true; more.textContent = 'Loading…'; runGroups(); });
+    wireAssignButtons(runGroups);
+  });
 }
 function runFind() {
   apiCall('findSchools', { filters: FIND }).then(function (res) {
-    if (!res.ok) { document.getElementById('flist').innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
+    var ff = document.getElementById('ff'), fl = document.getElementById('flist');
+    if (!ff) return;
+    if (!res.ok) { fl.innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
     var opt = function (list, cur, all) { return '<option value="">' + all + '</option>' + list.map(function (x) { return '<option' + (x === cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join(''); };
-    document.getElementById('ff').innerHTML =
+    ff.innerHTML =
       '<select data-f="taluk">' + opt(res.taluks, FIND.taluk, 'All taluks') + '</select>' +
       '<select data-f="hobli">' + opt(res.hoblis, FIND.hobli, 'All hoblis') + '</select>' +
       '<select data-f="gp">' + opt(res.gps, FIND.gp, 'All GPs') + '</select>' +
-      '<select data-f="show"><option value="">All schools</option><option value="free"' + (FIND.show === 'free' ? ' selected' : '') + '>Not assigned</option><option value="assigned"' + (FIND.show === 'assigned' ? ' selected' : '') + '>Assigned</option><option value="caution"' + (FIND.show === 'caution' ? ' selected' : '') + '>Not ready or merged</option></select>' +
-      '<input type="search" data-f="q" placeholder="School, village, UDISE or Vol number" value="' + esc(FIND.q) + '" style="min-width:240px">';
-    Array.prototype.forEach.call(document.querySelectorAll('#ff [data-f]'), function (el) {
+      '<select data-f="show">' + [['', 'All schools'], ['free', 'Not given'], ['assigned', 'Given'], ['mine', APP.me.role === 'Admin' ? 'Given (any)' : 'My volunteers\''], ['notwilling', 'Not willing'], ['caution', 'Not ready or merged']]
+        .map(function (x) { return '<option value="' + x[0] + '"' + (FIND.show === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>' +
+      '<input type="search" data-f="q" placeholder="School, village, UDISE or Vol number" value="' + esc(FIND.q) + '" style="min-width:220px">';
+    Array.prototype.forEach.call(ff.querySelectorAll('[data-f]'), function (el) {
       el.addEventListener('change', function () {
         FIND[el.dataset.f] = el.value;
         if (el.dataset.f === 'taluk') { FIND.hobli = ''; FIND.gp = ''; }
         if (el.dataset.f === 'hobli') FIND.gp = '';
-        document.getElementById('flist').innerHTML = '<p class="small">Loading…</p>';
+        fl.innerHTML = '<p class="small">Loading…</p>';
         runFind();
       });
     });
-    var h = '<p class="small">' + fmtN(res.total) + ' school' + (res.total === 1 ? '' : 's') + (res.total > res.schools.length ? ', first ' + res.schools.length + ' shown' : '') + '. Tap a row to open the school. Press Enter after typing in the search box.</p>';
-    h += '<div class="tbl-wrap"><table><thead><tr><th class="n">Sl. No.</th><th>School</th><th>Place</th><th>Group</th><th>Given</th><th>Assigned to</th></tr></thead><tbody>';
+    var h = '<p class="small">' + fmtN(res.total) + ' school' + (res.total === 1 ? '' : 's') + (res.total > res.schools.length ? ', first ' + res.schools.length + ' shown' : '') + '. Tick schools, then Give or Take back. Press Enter after typing in the search box.</p>';
+    h += '<div class="bar"><span class="small" id="fcount">0 ticked</span><button class="btn sm primary" type="button" id="fgive">Give ticked</button><button class="btn sm" type="button" id="fback">Take back ticked</button></div>';
+    h += '<div class="tbl-wrap"><table><thead><tr><th><input type="checkbox" id="fall" aria-label="Tick all shown"></th><th class="n">Sl. No.</th><th>School</th><th>Place</th><th>Group</th><th>Given in Phase 1</th><th>With</th></tr></thead><tbody>';
     res.schools.forEach(function (s) {
       var given = [s.saplings ? fmtN(s.saplings) + ' saplings' : '', s.seeds ? fmtN(s.seeds) + ' seeds' : ''].filter(String).join(' + ');
-      h += '<tr class="click" data-open="' + s.id + '"><td class="n">' + s.id + '</td><td><b>' + esc(s.name) + '</b><div class="small">' + esc(s.udise) + '</div>' + (s.caution ? chip(s.activity === 'Not Ready' ? 'Not ready' : 'Merged', 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') + '</td>' +
+      h += '<tr><td><input type="checkbox" data-tick="' + s.id + '" aria-label="Tick"></td><td class="n">' + s.id + '</td><td><button class="link" type="button" data-open="' + s.id + '"><b>' + esc(s.name) + '</b></button><div class="small">' + esc(s.udise) + '</div>' +
+        (s.caution ? chip(/not ready/i.test(s.activity) ? 'Not ready' : 'Merged', 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') + '</td>' +
         '<td>' + esc(s.taluk) + '<div class="small">' + esc([s.hobli, s.gp, s.village].join(' · ')) + '</div></td>' +
         '<td>' + (s.group ? 'Vol ' + s.groupNo : '-') + '</td><td>' + esc(given || '-') + '</td><td>' + esc(s.assignedTo || '-') + '</td></tr>';
     });
-    document.getElementById('flist').innerHTML = h + '</tbody></table></div>';
-    Array.prototype.forEach.call(document.querySelectorAll('#flist [data-open]'), function (tr) {
-      tr.addEventListener('click', function () { location.hash = 'admin/school/' + tr.dataset.open; });
-    });
+    fl.innerHTML = h + '</tbody></table></div>';
+    var ticked = function () { return Array.prototype.filter.call(fl.querySelectorAll('[data-tick]'), function (c) { return c.checked; }).map(function (c) { return c.dataset.tick; }); };
+    fl.addEventListener('change', function () { document.getElementById('fcount').textContent = ticked().length + ' ticked'; });
+    document.getElementById('fall').addEventListener('change', function () { var on = this.checked; Array.prototype.forEach.call(fl.querySelectorAll('[data-tick]'), function (c) { c.checked = on; }); document.getElementById('fcount').textContent = ticked().length + ' ticked'; });
+    document.getElementById('fgive').addEventListener('click', function () { var ids = ticked(); if (!ids.length) { toast('Tick at least one school.'); return; } giveSchools(ids, runFind); });
+    document.getElementById('fback').addEventListener('click', function () { var ids = ticked(); if (!ids.length) { toast('Tick at least one school.'); return; } takeBackSchools(ids, runFind); });
+    wireAssignButtons(runFind);
   });
+}
+function wireAssignButtons(again) {
+  Array.prototype.forEach.call(document.querySelectorAll('#flist [data-open]'), function (b) { b.addEventListener('click', function () { openSchoolFrom(b.dataset.open); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('#flist [data-give]'), function (b) { b.addEventListener('click', function () { giveSchools(b.dataset.give.split(','), again); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('#flist [data-back]'), function (b) { b.addEventListener('click', function () { takeBackSchools(b.dataset.back.split(','), again); }); });
 }
 /* ===== END P7.3 ===== */
 
-/* ===== START P7.4 Admin: uploaded A4 forms ===== */
-// The office works from this list. Entering the form into the app comes in D3.
+/* ===== START P7.4 Admin: uploaded A4 forms (office enters them) ===== */
 function screenA4List() {
   setMain(subTabs() + '<h2>Uploaded A4 forms</h2><p class="small">Loading…</p>');
+  wireSubTabs();
   apiCall('a4List').then(function (res) {
-    if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); return; }
-    var list = res.uploads || [];
-    var h = subTabs() + '<h2>Uploaded A4 forms</h2><p class="small">' + list.length + ' upload' + (list.length === 1 ? '' : 's') + '. Entering them into the app comes in D3.</p>';
-    if (!list.length) { setMain(h + '<div class="card">Nothing uploaded yet.</div>'); wireSubTabs(); return; }
-    h += '<div class="tbl-wrap"><table><thead><tr><th>Visit date</th><th>School</th><th>Volunteer</th><th>Files</th><th>Note</th><th>Status</th></tr></thead><tbody>';
-    list.forEach(function (u) {
-      h += '<tr><td>' + esc(u.visitDate) + '<div class="small">uploaded ' + esc(u.uploadedOn) + '</div></td><td><button class="link" type="button" data-open="' + u.schoolId + '">' + esc(u.school) + '</button></td><td>' + esc(u.by) + '</td>' +
-        '<td>' + u.links.map(function (l, i) { return '<a class="link" href="' + esc(l) + '" target="_blank" rel="noopener">File ' + (i + 1) + '</a>'; }).join('<br>') + '</td>' +
-        '<td>' + esc(u.note || '-') + '</td><td>' + (u.entered ? chip('Entered', 'good') : chip('Waiting', 'warn')) + '</td></tr>';
+    if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); wireSubTabs(); return; }
+    var list = res.uploads || [], show = APP.a4show || 'waiting';
+    var shown = list.filter(function (u) { return show === 'all' || (show === 'waiting' ? !u.entered : u.entered); });
+    var h = subTabs() + '<h2>Uploaded A4 forms</h2><div class="filters"><select id="a4show">' + [['waiting', 'Waiting for the office'], ['entered', 'Entered'], ['all', 'All']].map(function (x) {
+      return '<option value="' + x[0] + '"' + (show === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select><span class="small">' + shown.length + ' shown. Open the files, then "Enter this form" fills the visit for the volunteer.</span></div>';
+    if (!shown.length) { setMain(h + '<div class="card">Nothing here.</div>'); wireSubTabs(); wireA4Show(); return; }
+    h += '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Visit date</th><th>School</th><th>Volunteer</th><th>Files</th><th>Note</th><th>Status</th></tr></thead><tbody>';
+    shown.forEach(function (u, i) {
+      h += '<tr><td>' + (i + 1) + '</td><td>' + esc(u.visitDate) + '<div class="small">uploaded ' + esc(u.uploadedOn) + '</div></td><td><button class="link" type="button" data-open="' + u.schoolId + '">' + esc(u.school) + '</button></td><td>' + esc(u.by) + '</td>' +
+        '<td>' + u.links.map(function (l, k) { return '<a class="link" href="' + esc(l) + '" target="_blank" rel="noopener">File ' + (k + 1) + '</a>'; }).join('<br>') + '</td>' +
+        '<td>' + esc(u.note || '-') + '</td><td>' + (u.entered ? chip('Entered', 'good') + '<div class="small">' + esc(u.enteredBy) + '</div>' : '<button class="btn sm primary" type="button" data-enter="' + esc(u.id) + '">Enter this form</button>') + '</td></tr>';
     });
-    setMain(h + '</tbody></table></div>'); wireSubTabs();
+    setMain(h + '</tbody></table></div>'); wireSubTabs(); wireA4Show();
     Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) {
-      b.addEventListener('click', function () { location.hash = 'admin/school/' + b.dataset.open; });
+      b.addEventListener('click', function () { openSchoolFrom(b.dataset.open); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-enter]'), function (b) {
+      b.addEventListener('click', function () {
+        var u = list.filter(function (x) { return x.id === b.dataset.enter; })[0];
+        APP.office = { a4Id: u.id, schoolId: u.schoolId, volunteer: u.by, visitDay: u.visitDay, visitDate: u.visitDate, links: u.links, fromList: true };
+        openSchoolFrom(u.schoolId);
+      });
     });
   });
 }
+function wireA4Show() {
+  var s = document.getElementById('a4show');
+  if (s) s.addEventListener('change', function () { APP.a4show = s.value; route(); });
+}
 /* ===== END P7.4 ===== */
 
-/* ===== START P7.5 Screens coming later ===== */
-function screenComing(title, when, text) {
-  setMain(subTabs() + '<h2>' + esc(title) + '</h2><div class="card"><p>' + esc(text) + '</p><p class="small">Comes in ' + esc(when) + '.</p></div>');
-  wireSubTabs();
+/* ===== START P7.5 Alerts block ===== */
+// "Needs attention": Pit digging / tree guard and Concern ticked in a visit. Not willing: a separate list.
+function alertsBlock(boxId) {
+  apiCall('alerts').then(function (res) {
+    var box = document.getElementById(boxId);
+    if (!box || !res.ok) return;
+    var h = '';
+    if (res.alerts.length) {
+      h += '<h3>⚠ ' + WORDS.alertsTitle + ' (' + res.alerts.length + ')</h3>' + res.alerts.slice(0, 30).map(function (a) {
+        return '<div class="alert-row"><b>' + esc(a.kinds.join(' · ')) + '</b> · <button class="link" type="button" data-aopen="' + a.schoolId + '">' + esc(a.school) + '</button>' +
+          '<div class="small">' + esc(a.place) + ' · visit ' + esc(a.date) + ' · ' + esc(a.volunteer) + '</div>' + (a.remarks ? '<div>' + esc(a.remarks) + '</div>' : '') +
+          '<button class="btn sm" type="button" data-adone="' + esc(a.visitId) + '" style="margin-top:4px">Mark done</button></div>';
+      }).join('');
+    }
+    if (res.notWilling.length) {
+      h += '<h3 style="margin-top:12px">' + WORDS.notWillingList + ' (' + res.notWilling.length + ')</h3>' + res.notWilling.slice(0, 30).map(function (a) {
+        return '<div class="alert-row bad"><button class="link" type="button" data-aopen="' + a.schoolId + '">' + esc(a.school) + '</button> <span class="small">' + esc(a.place) + '</span>' +
+          '<div>' + esc(a.reason || '-') + '</div><div class="small">' + esc(a.on) + ' · ' + esc(a.by) + (a.volunteer ? ' · with ' + esc(a.volunteer) : '') + '</div></div>';
+      }).join('');
+    }
+    box.innerHTML = h ? '<div style="margin-bottom:16px">' + h + '</div>' : '';
+    Array.prototype.forEach.call(box.querySelectorAll('[data-aopen]'), function (b) { b.addEventListener('click', function () { openSchoolFrom(b.dataset.aopen); }); });
+    Array.prototype.forEach.call(box.querySelectorAll('[data-adone]'), function (b) {
+      b.addEventListener('click', function () {
+        b.disabled = true;
+        apiCall('alertDone', { visitId: b.dataset.adone }).then(function (r) { if (!r.ok) { toast(r.error); b.disabled = false; return; } toast('Marked done.'); alertsBlock(boxId); });
+      });
+    });
+  });
 }
 /* ===== END P7.5 ===== */
 
-/* ===== START P8.1 Map (comes in D5) ===== */
-function screenMap() {
-  setMain('<h2>Map</h2><div class="card"><p>The map of schools comes in D5: approximate positions first, replaced by the real GPS pin once a volunteer saves the school location.</p></div>');
+/* ===== START P7.6 Admin: coordinators ===== */
+function screenCoordinators() {
+  setMain(subTabs() + '<h2>Coordinators</h2><p class="small">Loading…</p>');
+  wireSubTabs();
+  apiCall('volunteers').then(function (res) {
+    if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); wireSubTabs(); return; }
+    APP.vols = res.volunteers;
+    var coords = APP.vols.filter(function (v) { return /^coord/i.test(v.role); });
+    var others = APP.vols.filter(function (v) { return !/^coord/i.test(v.role) && /^active$/i.test(v.status); });
+    var noCoord = APP.vols.filter(function (v) { return /^vol/i.test(v.role) && !v.coordinator; }).length;
+    var h = subTabs() + '<h2>Coordinators</h2><p class="small">' + noCoord + ' volunteer' + (noCoord === 1 ? ' has' : 's have') + ' no coordinator yet: give them in Admin → Volunteers (tick, then "Give to coordinator").</p>';
+    h += '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Coordinator</th><th>Status</th><th class="n">Volunteers</th><th class="n">Their schools</th><th class="n">Visited</th><th></th></tr></thead><tbody>';
+    coords.forEach(function (c, i) {
+      var mine = APP.vols.filter(function (v) { return v.coordinator === c.email; });
+      h += '<tr><td>' + (i + 1) + '</td><td><b>' + esc(c.name) + '</b><div class="small">' + esc(c.email) + '</div></td><td>' + chip(c.status, /^active$/i.test(c.status) ? 'good' : 'bad') + '</td>' +
+        '<td class="n">' + mine.length + '</td><td class="n">' + mine.reduce(function (t, v) { return t + v.schools; }, 0) + '</td><td class="n">' + mine.reduce(function (t, v) { return t + v.visited; }, 0) + '</td>' +
+        '<td><button class="btn sm" type="button" data-unmake="' + esc(c.email) + '">Make volunteer again</button></td></tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<h3 style="margin-top:18px">Make a person coordinator</h3><div class="bar"><input type="search" id="mq" placeholder="Find a person" style="max-width:200px">' +
+      '<select id="mp"><option value="">Choose…</option>' + others.map(function (v) { return '<option value="' + esc(v.email) + '">' + esc(v.name) + ' · ' + esc(v.email) + '</option>'; }).join('') + '</select>' +
+      '<button class="btn sm primary" type="button" id="mgo">Make coordinator</button></div>';
+    setMain(h); wireSubTabs();
+    document.getElementById('mq').addEventListener('input', function () {
+      var q = this.value.toLowerCase();
+      Array.prototype.forEach.call(document.getElementById('mp').options, function (o, i) { if (i) o.hidden = q && o.textContent.toLowerCase().indexOf(q) < 0; });
+    });
+    var setRole = function (email, role) {
+      apiCall('savePeople', { emails: [email], set: { role: role } }).then(function (r) { toast(r.ok ? 'Saved.' : r.error); if (r.ok) route(); });
+    };
+    document.getElementById('mgo').addEventListener('click', function () { var e = document.getElementById('mp').value; if (!e) { toast('Choose the person.'); return; } setRole(e, 'Coordinator'); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-unmake]'), function (b) {
+      b.addEventListener('click', function () {
+        if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Tap again to confirm'; return; }
+        setRole(b.dataset.unmake, 'Volunteer');
+      });
+    });
+  });
 }
+/* ===== END P7.6 ===== */
+
+/* ===== START P7.7 Corrections (approve or reject) ===== */
+// Admin: all schools. Coordinator: the schools of their volunteers.
+function screenCorrections() {
+  setMain(subTabs() + '<h2>Corrections</h2><p class="small">Loading…</p>');
+  wireSubTabs();
+  apiCall('corrections').then(function (res) {
+    if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); wireSubTabs(); return; }
+    var h = subTabs() + '<h2>Corrections</h2><p class="small">Proposed with "Update details". Approving shows the new value in the app; your own tabs in the Sheet are not changed.</p>';
+    if (!res.pending.length) h += '<div class="card">Nothing is waiting.</div>';
+    res.pending.forEach(function (c) {
+      h += '<div class="card" style="margin-bottom:10px"><b>' + esc(c.field) + '</b> · <button class="link" type="button" data-open="' + c.schoolId + '">' + esc(c.school) + '</button>' +
+        '<div style="margin-top:6px">New: <b>' + esc(c.value) + '</b></div>' + (c.species ? '<div class="small">Species: ' + esc(c.species) + '</div>' : '') +
+        '<div class="old">' + (c.field.indexOf('Other') === 0 ? 'About: ' : 'Old: ') + esc(c.old || '-') + '</div>' +
+        '<div class="small">Proposed by ' + esc(c.by) + ', ' + esc(c.on) + '</div>' +
+        '<div style="margin-top:8px;display:flex;gap:8px"><button class="btn sm primary" type="button" data-dec="Approve" data-id="' + esc(c.id) + '">Approve</button>' +
+        '<button class="btn sm danger" type="button" data-dec="Reject" data-id="' + esc(c.id) + '">Reject</button></div></div>';
+    });
+    if (res.done.length) {
+      h += '<h3 style="margin-top:18px">Recently decided</h3><div class="tbl-wrap"><table><thead><tr><th>School</th><th>What</th><th>New value</th><th>Decision</th></tr></thead><tbody>' +
+        res.done.map(function (c) { return '<tr><td>' + esc(c.school) + '</td><td>' + esc(c.field) + '</td><td>' + esc(c.value) + '</td><td>' + chip(c.status, /approved/i.test(c.status) ? 'good' : 'bad') + '<div class="small">' + esc(c.decidedBy) + ', ' + esc(c.decidedOn) + '</div></td></tr>'; }).join('') +
+        '</tbody></table></div>';
+    }
+    setMain(h); wireSubTabs();
+    Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) { b.addEventListener('click', function () { openSchoolFrom(b.dataset.open); }); });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-dec]'), function (b) {
+      b.addEventListener('click', function () {
+        b.disabled = true;
+        apiCall('decide', { id: b.dataset.id, decision: b.dataset.dec }).then(function (r) { toast(r.ok ? (b.dataset.dec === 'Approve' ? 'Approved.' : 'Rejected.') : r.error); route(); });
+      });
+    });
+  });
+}
+/* ===== END P7.7 ===== */
+
+/* ===== START P8.1 Map ===== */
+// Solid dot = real position saved at the school. Hollow dot = approximate (village, or near the taluk centre).
+// Admin: all schools. Coordinator: their volunteers' schools (and own). Volunteer: own schools.
+var MAPF = { taluk: '', show: '', q: '' };
+function screenMap() {
+  setMain('<h2>Map</h2><div class="filters" id="mf"></div><div class="legend" id="mlegend"></div><div id="map"><p class="small" style="padding:12px">Loading the map…</p></div><p class="small" id="mcount"></p>');
+  loadLeaflet(function () {
+    apiCall('map').then(function (res) {
+      if (!document.getElementById('map')) return;
+      if (!res.ok) { document.getElementById('map').innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
+      APP.points = res.points;
+      var taluks = res.points.map(function (p) { return p.t; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; }).sort();
+      document.getElementById('mf').innerHTML = '<select data-m="taluk"><option value="">All taluks</option>' + taluks.map(function (t) { return '<option' + (MAPF.taluk === t ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' +
+        '<select data-m="show">' + [['', 'All schools'], ['given', 'Given to a volunteer'], ['free', 'Not given'], ['visited', 'Visited'], ['notwilling', 'Not willing'], ['caution', 'Not ready or merged'], ['gps', 'Real position saved']]
+          .map(function (x) { return '<option value="' + x[0] + '"' + (MAPF.show === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>' +
+        '<input type="search" data-m="q" placeholder="School or village" value="' + esc(MAPF.q) + '">';
+      document.getElementById('mlegend').innerHTML = [['--map-visited', 'Visited'], ['--map-given', 'Given, not visited yet'], ['--map-free', 'Not given'], ['--map-bad', 'Not willing'], ['--map-caution', 'Not ready or merged']]
+        .map(function (x) { return '<span><span class="dot" style="background:var(' + x[0] + ')"></span>' + x[1] + '</span>'; }).join('') +
+        '<span><span class="dot"  style="background:var(--muted)"></span>real position</span><span style="color:var(--muted)"><span class="dot hollow"></span>approximate</span>';
+      Array.prototype.forEach.call(document.querySelectorAll('[data-m]'), function (el) {
+        el.addEventListener('change', function () { MAPF[el.dataset.m] = el.value; drawMap(); });
+      });
+      document.getElementById('map').innerHTML = '';
+      APP.map = L.map('map', { preferCanvas: true }).setView([13.55, 77.75], 9);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(APP.map);
+      APP.mapLayer = L.layerGroup().addTo(APP.map);
+      drawMap(true);
+    });
+  });
+}
+function loadLeaflet(done) {
+  if (window.L) return done();
+  var css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(css);
+  var js = document.createElement('script'); js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+  js.onload = done;
+  js.onerror = function () { var m = document.getElementById('map'); if (m) m.innerHTML = '<div class="msg bad">The map could not load. Check the internet and try again.</div>'; };
+  document.head.appendChild(js);
+}
+function drawMap(fit) {
+  var cs = getComputedStyle(document.documentElement), col = function (v) { return cs.getPropertyValue(v).trim(); };
+  var q = MAPF.q.toLowerCase();
+  var pts = APP.points.filter(function (p) {
+    if (MAPF.taluk && p.t !== MAPF.taluk) return false;
+    if (MAPF.show === 'given' && !p.a) return false;
+    if (MAPF.show === 'free' && p.a) return false;
+    if (MAPF.show === 'visited' && !p.lv) return false;
+    if (MAPF.show === 'notwilling' && !p.w) return false;
+    if (MAPF.show === 'caution' && !p.c) return false;
+    if (MAPF.show === 'gps' && p.k !== 'gps') return false;
+    return !q || (p.n + ' ' + p.v + ' ' + p.g).toLowerCase().indexOf(q) >= 0;
+  });
+  APP.mapLayer.clearLayers();
+  var rank = function (p) { return p.w ? 4 : p.lv ? 3 : p.a ? 2 : p.c ? 1 : 0; };
+  pts.sort(function (a, b) { return rank(a) - rank(b); });      // free schools below, given and visited on top
+  var bounds = [];
+  pts.forEach(function (p) {
+    var c = p.w ? col('--map-bad') : p.c ? col('--map-caution') : p.lv ? col('--map-visited') : p.a ? col('--map-given') : col('--map-free');
+    var real = p.k === 'gps';
+    var m = L.circleMarker([p.la, p.lo], { radius: real ? 7 : 6, color: c, weight: real ? 1 : 2, fillColor: c, fillOpacity: real ? 0.9 : 0.05 });
+    m.bindPopup('<b>' + esc(p.n) + '</b><br>' + esc([p.v, p.g, p.h, p.t].filter(String).join(' · ')) + '<br>' +
+      (p.a ? 'With ' + esc(p.a) : 'Not given') + (p.lv ? '<br>Last visit ' + esc(niceDate(p.lv)) : '') + (p.w ? '<br><b>' + WORDS.notWilling + '</b>' : '') +
+      (p.gr ? '<br>Vol ' + p.gr : '') + '<br><span style="color:#888">' + (real ? 'Real position' : p.k === 'village' ? 'Approximate (village)' : 'Approximate (taluk)') + '</span><br>' +
+      '<a href="https://www.google.com/maps?q=' + p.la + ',' + p.lo + '" target="_blank" rel="noopener">Open in Google Maps</a> · <a href="#" data-mapopen="' + p.id + '">Open school</a>');
+    m.addTo(APP.mapLayer);
+    bounds.push([p.la, p.lo]);
+  });
+  document.getElementById('mcount').textContent = pts.length + ' school' + (pts.length === 1 ? '' : 's') + ' on the map.';
+  if (bounds.length && (fit || MAPF.taluk || q)) APP.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+}
+document.addEventListener('click', function (ev) {
+  var a = ev.target.closest && ev.target.closest('[data-mapopen]');
+  if (!a) return;
+  ev.preventDefault();
+  openSchoolFrom(a.dataset.mapopen);
+});
 /* ===== END P8.1 ===== */
 
 /* ===== START P10.2 Tabs, screens and the phone Back button ===== */
@@ -725,42 +1661,50 @@ function wireSubTabs() {
 }
 function route() {
   if (!APP.me) return;
+  if (APP.map) { try { APP.map.remove(); } catch (e) { } APP.map = null; }
   var tops = myTops();
   var parts = (location.hash || '').replace('#', '').split('/');
   var top = tops.indexOf(parts[0]) >= 0 ? parts[0] : (APP.me.role === 'Admin' ? 'admin' : APP.me.role === 'Coordinator' ? 'coord' : 'vol');
   var sub = parts[1] || '';
   if (TOP[top].subs && sub !== 'school' && !TOP[top].subs.some(function (s) { return s[0] === sub; })) sub = TOP[top].subs[0][0];
+  if (!TOP[top].subs && sub !== 'school') sub = '';
   APP.where = { top: top, sub: sub };
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'), function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === top)); });
   window.scrollTo(0, 0);
-  if (sub === 'school' && parts[2]) return screenSchool(parts[2], top === 'vol' ? 'vol' : top + '/assign');
+  if (sub === 'school' && parts[2]) return screenSchool(parts[2], APP.backHash || (top === 'vol' || top === 'map' ? top : top + '/' + TOP[top].subs[0][0]));
   if (top === 'vol') return screenMySchools();
   if (top === 'map') return screenMap();
   if (sub === 'volunteers') return screenVolunteers();
   if (sub === 'dashboard') return screenDashboard();
   if (sub === 'a4') return screenA4List();
-  if (sub === 'assign' && top === 'admin') return screenAssign();
-  if (sub === 'assign') return screenComing('Assignments', 'D2', 'Here you will give free schools to your own volunteers.');
-  if (sub === 'coordinators') return screenComing('Coordinators', 'D2', 'Here you will make volunteers coordinators and give volunteers to coordinators in bulk.');
-  if (sub === 'corrections') return screenComing('Corrections', 'D4', 'Here you will approve the changes volunteers propose with "Update details".');
+  if (sub === 'assign') return screenAssign();
+  if (sub === 'coordinators') return screenCoordinators();
+  if (sub === 'corrections') return screenCorrections();
+}
+// Opens a school and remembers this screen, so "Back" returns here.
+function openSchoolFrom(id) {
+  APP.backHash = (location.hash || '#vol').replace('#', '');
+  location.hash = APP.where.top + '/school/' + id;
 }
 window.addEventListener('hashchange', route);
 /* ===== END P10.2 ===== */
 
 /* ===== START P10.3 Small helpers ===== */
-var APP = { token: '', clientId: '', me: null, settings: {}, vols: [], school: null, a4files: [], preSchools: null, where: { top: '', sub: '' } };
+var APP = { token: '', clientId: '', me: null, settings: {}, vols: [], school: null, a4files: [], preSchools: null, openVol: '', backHash: '', where: { top: '', sub: '' },
+            picked: {}, office: null, editVisit: null, visitPhotos: [], giveTo: '', people: [], points: [], map: null };
 function esc(v) { return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function fmtN(n) { return (n === null || n === undefined || n === '') ? '-' : Number(n).toLocaleString('en-IN'); }
 function chip(t, kind) { return '<span class="chip' + (kind ? ' ' + kind : '') + '">' + esc(t) + '</span>'; }
 function kv(label, value) { return '<div><dt>' + esc(label) + '</dt><dd>' + esc(value === '' || value === null || value === undefined ? '-' : value) + '</dd></div>'; }
+function opts(list, cur) { return '<option value="">Choose…</option>' + (list || []).map(function (x) { return '<option' + (x === cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join(''); }
 function setMain(html) { document.getElementById('main').innerHTML = html; }
 function toast(text) {
   Array.prototype.forEach.call(document.querySelectorAll('.toast'), function (x) { x.remove(); });
   var t = document.createElement('div');
   t.className = 'msg good toast'; t.textContent = text;
-  t.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:9;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:90vw';
+  t.style.cssText = 'position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:2000;box-shadow:0 4px 16px rgba(0,0,0,.2);max-width:90vw';
   document.body.appendChild(t);
-  setTimeout(function () { t.remove(); }, 3500);
+  setTimeout(function () { t.remove(); }, 4000);
 }
 /* ===== END P10.3 ===== */
 
@@ -776,13 +1720,11 @@ document.getElementById('signout').addEventListener('click', function () { signO
   if (APP.token) { loadMe(); return; }
   apiCall('config').then(function (res) {
     if (!res.ok || !res.clientId) {
-      setMain('<div class="signin-box"><div class="msg bad">The backend is reachable, but the sign-in key (OAUTH_CLIENT_ID) is missing in Script Properties.</div></div>');
+      setMain('<div class="signin-box"><div class="msg bad">' + (res.ok ? 'The backend is reachable, but the sign-in key (OAUTH_CLIENT_ID) is missing in Script Properties.' : 'Could not reach the backend. Check the link in P2.1, and that the web app is deployed with access "Anyone".') + '</div></div>');
       return;
     }
     APP.clientId = res.clientId;
     showSignIn('');
-  }).catch(function () {
-    setMain('<div class="signin-box"><div class="msg bad">Could not reach the backend. Check the link in P2.1, and that the web app is deployed with access "Anyone".</div></div>');
   });
 })();
 /* ===== END P10.4 ===== */
