@@ -60,7 +60,7 @@
 <title>Hasiru Shaale · School adoption</title>
 
 <!-- ===== START P0.0 Version ===== -->
-<meta name="app-version" content="2026-11-03 v5">
+<meta name="app-version" content="2026-11-03 v6">
 <!-- ===== END P0.0 ===== -->
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -182,7 +182,7 @@ tr.click:hover td { background: var(--surface-2); }
 /* ===== START P2.1 Web app link ===== */
 // Paste the web app link (it ends in /exec) between the quotes.
 var CONFIG = {
-  EXEC_URL: 'https://script.google.com/macros/s/AKfycbwiPbvvTZoShDMtUDFjSLNMj7LEsSot4F2M30UUgO7pxoUXj93vypjB04l_991g8oBq/exec',
+  EXEC_URL: 'https://hasiruchikkaballapura.github.io/hasirushaale-adoption/',
   A4_FORM_FILE: 'a4-visit-form.pdf'     // the printable A4 form, kept in the same GitHub folder
 };
 /* ===== END P2.1 ===== */
@@ -233,6 +233,10 @@ function onSignedIn(resp) {
 }
 function signOut(message) {
   APP.token = ''; APP.me = null;
+  if (!APP.clientId) {
+    apiCall('config').then(function (res) { APP.clientId = res.clientId || ''; signOut(message); });
+    return;
+  }
   try { sessionStorage.removeItem('hs_token'); } catch (e) { }
   if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect();
   showSignIn(message || '');
@@ -242,6 +246,8 @@ function loadMe() {
   apiCall('me').then(function (res) {
     if (!res.ok) { signOut(res.error); return; }
     APP.me = res.person; APP.settings = res.settings || {};
+    APP.preSchools = res.schools || null;            // My schools come with the sign-in, saving one wait
+    if (res.clientId) APP.clientId = res.clientId;
     document.getElementById('top').hidden = false;
     document.getElementById('who-name').textContent = res.person.name + ' · ' + res.person.role;
     buildTabs();
@@ -274,7 +280,9 @@ var WORDS = {
 /* ===== START P5.1 My schools (list) ===== */
 function screenMySchools() {
   setMain('<h2>' + WORDS.mySchools + '</h2><p class="small">Loading your schools…</p>');
-  apiCall('mySchools').then(function (res) {
+  var ready = APP.preSchools ? Promise.resolve({ ok: true, schools: APP.preSchools }) : apiCall('mySchools');
+  APP.preSchools = null;
+  ready.then(function (res) {
     if (!res.ok) { setMain('<div class="msg bad">' + esc(res.error) + '</div>'); return; }
     var list = res.schools || [];
     var h = '<h2>' + WORDS.mySchools + '</h2>';
@@ -740,7 +748,7 @@ window.addEventListener('hashchange', route);
 /* ===== END P10.2 ===== */
 
 /* ===== START P10.3 Small helpers ===== */
-var APP = { token: '', clientId: '', me: null, settings: {}, vols: [], school: null, a4files: [], where: { top: '', sub: '' } };
+var APP = { token: '', clientId: '', me: null, settings: {}, vols: [], school: null, a4files: [], preSchools: null, where: { top: '', sub: '' } };
 function esc(v) { return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function fmtN(n) { return (n === null || n === undefined || n === '') ? '-' : Number(n).toLocaleString('en-IN'); }
 function chip(t, kind) { return '<span class="chip' + (kind ? ' ' + kind : '') + '">' + esc(t) + '</span>'; }
@@ -757,20 +765,22 @@ function toast(text) {
 /* ===== END P10.3 ===== */
 
 /* ===== START P10.4 Start ===== */
+// If this tab already signed in, go straight in (one wait instead of two).
 document.getElementById('signout').addEventListener('click', function () { signOut(''); });
 (function start() {
   if (!/\/exec$/.test(CONFIG.EXEC_URL)) {
     setMain('<div class="signin-box"><div class="msg bad">The web app link is not filled in yet. Put it in section P2.1 of this file.</div></div>');
     return;
   }
+  try { APP.token = sessionStorage.getItem('hs_token') || ''; } catch (e) { APP.token = ''; }
+  if (APP.token) { loadMe(); return; }
   apiCall('config').then(function (res) {
     if (!res.ok || !res.clientId) {
       setMain('<div class="signin-box"><div class="msg bad">The backend is reachable, but the sign-in key (OAUTH_CLIENT_ID) is missing in Script Properties.</div></div>');
       return;
     }
     APP.clientId = res.clientId;
-    try { APP.token = sessionStorage.getItem('hs_token') || ''; } catch (e) { APP.token = ''; }
-    if (APP.token) loadMe(); else showSignIn('');
+    showSignIn('');
   }).catch(function () {
     setMain('<div class="signin-box"><div class="msg bad">Could not reach the backend. Check the link in P2.1, and that the web app is deployed with access "Anyone".</div></div>');
   });
