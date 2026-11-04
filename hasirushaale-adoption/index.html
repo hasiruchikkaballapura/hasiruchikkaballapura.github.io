@@ -75,7 +75,7 @@
 <title>Hasiru Shaale · School adoption</title>
 
 <!-- ===== START P0.0 Version ===== -->
-<meta name="app-version" content="2026-11-04 v9">
+<meta name="app-version" content="2026-11-04 v9.2">
 <!-- ===== END P0.0 ===== -->
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -207,7 +207,11 @@ tr.click:hover td { background: var(--surface-2); }
 .crumbs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; font-size: 14px; }
 .combo-wrap { flex: 1; min-width: 240px; }
 .combo { position: relative; }
-.combo-in { width: 100%; }
+.combo-in { width: 100%; padding-right: 40px !important; cursor: pointer; }
+.combo-arrow { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); border: 0; background: none; color: var(--muted); font-size: 16px; padding: 6px 8px; cursor: pointer; }
+.pref-box { margin: 6px 0 10px; }
+.pref-box .btn { margin-top: 8px; }
+.ver { font-size: 11px; color: var(--muted); }
 .combo-list { position: absolute; left: 0; right: 0; top: calc(100% + 2px); z-index: 1500; max-height: 320px; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
 .combo-item { display: block; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
 .combo-item:hover, .combo-item:focus { background: var(--surface-2); }
@@ -239,7 +243,7 @@ tr.click:hover td { background: var(--surface-2); }
 /* ===== START P2.1 Web app link ===== */
 // Paste the web app link (it ends in /exec) between the quotes.
 var CONFIG = {
-  EXEC_URL: 'https://script.google.com/macros/s/AKfycbwiPbvvTZoShDMtUDFjSLNMj7LEsSot4F2M30UUgO7pxoUXj93vypjB04l_991g8oBq/exec',
+  EXEC_URL: 'PASTE_THE_EXEC_LINK_HERE',
   A4_FORM_FILE: 'a4-visit-form.pdf'     // the printable A4 form, kept in the same GitHub folder
 };
 /* ===== END P2.1 ===== */
@@ -307,6 +311,15 @@ function signOut(message) {
   if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect();
   showSignIn(message || '');
 }
+// The version of this page (P0.0). If the server has a different version, the phone may be showing an old copy.
+function pageVersion() { var m = document.querySelector('meta[name=app-version]'); return m ? m.content : ''; }
+function versionNotice(server) {
+  var d = document.createElement('div');
+  d.className = 'msg warn'; d.id = 'vernote'; d.style.cssText = 'max-width:980px;margin:8px auto 0';
+  d.innerHTML = 'This page is ' + esc(pageVersion()) + ', the server is ' + esc(server) + '. If something looks old, <button class="link" type="button" id="verreload">tap here to load the newest page</button>.';
+  document.getElementById('top').appendChild(d);
+  document.getElementById('verreload').addEventListener('click', function () { location.replace(location.pathname + '?v=' + Date.now() + location.hash); });
+}
 function loadMe() {
   setMain('<div class="signin-box"><div class="card">Signing you in…</div></div>');
   apiCall('me').then(function (res) {
@@ -316,7 +329,8 @@ function loadMe() {
     APP.preSchools = true;
     if (res.clientId) APP.clientId = res.clientId;
     document.getElementById('top').hidden = false;
-    document.getElementById('who-name').textContent = res.person.name + ' · ' + res.person.role;
+    document.getElementById('who-name').innerHTML = esc(res.person.name + ' · ' + res.person.role) + ' <span class="ver">' + esc(pageVersion()) + '</span>';
+    if (res.version && res.version !== pageVersion()) versionNotice(res.version);
     buildTabs();
     route();
   }).catch(function () { });
@@ -592,8 +606,9 @@ function formBox(s) {
     '<a class="btn" href="' + CONFIG.A4_FORM_FILE + '" download>⬇ Download the A4 form</a>' +
     '<div class="line"></div><b>Upload the filled form</b>' +
     '<div class="form"><label>Date of the visit<input type="date" id="a4date" data-keep="a4.date" value="' + todayIST() + '" max="' + todayIST() + '"></label></div>' +
-    '<label class="btn primary">📷 Take or choose photos<input type="file" id="a4files" accept="image/*,application/pdf" multiple hidden></label>' +
-    '<span class="small" id="a4count" style="margin-left:8px">No photo chosen (up to 5)</span>' +
+    '<p class="small" style="margin:6px 0">Add the <b>front</b> page first, then the <b>back</b> page. Each photo is added to the list (up to 5).</p>' +
+    '<label class="btn primary">📷 Add a photo<input type="file" id="a4files" accept="image/*,application/pdf" multiple hidden></label>' +
+    '<span class="small" id="a4count" style="margin-left:8px">No photo added yet</span>' +
     '<div class="thumbs" id="a4thumbs"></div>' +
     '<label class="f" style="margin-top:8px">Note for the office (optional)<input type="text" id="a4note" data-keep="a4.note" placeholder="For example: photo 2 is the back side"></label>' +
     '<div id="a4msg"></div><button class="btn primary" id="a4send" type="button" style="margin-top:10px">Upload</button>';
@@ -610,16 +625,28 @@ function formBox(s) {
 function wireForm() {
   var s = APP.school, input = document.getElementById('a4files');
   APP.a4files = [];
+  // Each pick ADDS to the list (front, then back), so a phone camera that gives one photo at a time works.
+  var drawA4 = function () {
+    var n = APP.a4files.length, side = function (i) { return i === 0 ? 'Front' : i === 1 ? 'Back' : 'Photo ' + (i + 1); };
+    document.getElementById('a4count').textContent = n ? n + ' file' + (n === 1 ? '' : 's') + ' added' + (n === 1 ? ' (now add the back page)' : '') : 'No photo added yet';
+    document.getElementById('a4thumbs').innerHTML = APP.a4files.map(function (f, i) {
+      return '<div style="text-align:center"><div class="small">' + side(i) + '</div>' + (f.type === 'application/pdf' ? '<span class="chip">PDF</span>' : '<img src="' + f.data + '" alt="' + side(i) + '">') +
+        '<div><button class="link small" type="button" data-a4del="' + i + '">Remove</button></div></div>';
+    }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('[data-a4del]'), function (b) {
+      b.addEventListener('click', function () { APP.a4files.splice(Number(b.dataset.a4del), 1); drawA4(); });
+    });
+  };
   input.addEventListener('change', function () {
-    var picked = Array.prototype.slice.call(input.files || []).slice(0, 5);
+    var room = 5 - APP.a4files.length;
+    var picked = Array.prototype.slice.call(input.files || []).slice(0, Math.max(0, room));
+    input.value = '';
+    if (!picked.length) { if (room <= 0) toast('Up to 5 files, please.'); return; }
     document.getElementById('a4count').textContent = 'Preparing…';
     document.getElementById('a4msg').innerHTML = '';
     Promise.all(picked.map(shrinkFile)).then(function (files) {
-      APP.a4files = files;
-      document.getElementById('a4count').textContent = files.length + ' file' + (files.length === 1 ? '' : 's') + ' chosen';
-      document.getElementById('a4thumbs').innerHTML = files.map(function (f) {
-        return f.type === 'application/pdf' ? '<span class="chip">PDF</span>' : '<img src="' + f.data + '" alt="Chosen photo">';
-      }).join('');
+      APP.a4files = APP.a4files.concat(files);
+      drawA4();
     });
   });
   document.getElementById('a4send').addEventListener('click', function () {
@@ -1508,16 +1535,21 @@ function prefOf() {
 function prefBar() {
   var box = document.getElementById('apref'); if (!box) return;
   var p = (APP.people || []).filter(function (v) { return v.email === APP.giveTo; })[0], pref = prefOf();
-  if (!p) { box.innerHTML = ''; return; }
-  if (!pref) { box.innerHTML = '<p class="small">' + esc(p.name) + ' gave no preferred area in the sign-up form.</p>'; APP.usePref = false; return; }
-  box.innerHTML = '<label class="check" style="margin:4px 0 6px"><input type="checkbox" id="aprefon"' + (APP.usePref ? ' checked' : '') + '> <span>Show only <b>' + esc(p.name) + '</b>\'s preferred area: ' +
-    esc([pref.taluk, pref.hobli, pref.gp].filter(String).join(' · ')) + '</span></label><div class="small" id="aprefmatch"></div>';
-  document.getElementById('aprefon').addEventListener('change', function () { APP.usePref = this.checked; document.getElementById('flist').innerHTML = '<p class="small">Loading…</p>'; runAssign(); });
+  if (!p) { box.innerHTML = '<div class="msg pref-box small">📍 <b>Preferred area</b>: choose a person above. If they wrote a Taluk, Hobli or Gram Panchayat in the sign-up form, it shows here and you can list only the schools of that area.</div>'; return; }
+  if (!pref) { box.innerHTML = '<div class="msg pref-box small">📍 ' + esc(p.name) + ' did not write a preferred area in the sign-up form, so all areas are shown.</div>'; APP.usePref = false; return; }
+  var on = !!APP.usePref;
+  box.innerHTML = '<div class="msg ' + (on ? 'good' : '') + ' pref-box"><b>📍 ' + esc(p.name) + '\'s preferred area</b> (from the sign-up form):<div>' +
+    [['Taluk', pref.taluk], ['Hobli', pref.hobli], ['Gram Panchayat', pref.gp]].filter(function (x) { return x[1]; }).map(function (x) { return esc(x[0]) + ': <b>' + esc(x[1]) + '</b>'; }).join(' · ') + '</div>' +
+    '<div class="small" id="aprefmatch"></div>' +
+    '<button class="btn sm' + (on ? '' : ' primary') + '" type="button" id="aprefon">' + (on ? 'Show all areas again' : 'Show only schools in this area') + '</button></div>';
+  document.getElementById('aprefon').addEventListener('click', function () { APP.usePref = !on; prefBar(); document.getElementById('flist').innerHTML = '<p class="small">Loading…</p>'; runAssign(); });
+  var last = APP.grpRes || APP.findRes, m = document.getElementById('aprefmatch');
+  if (on && last && m) m.textContent = prefText(last.pref);
 }
 function prefText(m) {
   if (!m) return '';
   var got = [].concat(m.taluk, m.hobli, m.gp).filter(String);
-  return (got.length ? 'Matched in the school list: ' + got.join(' · ') + '.' : 'Nothing in the preferred area matched the school list.') +
+  return (got.length ? 'Showing schools in: ' + got.join(' · ') + '.' : 'None of these names matched the school list, so all areas are shown.') +
     (m.missed && m.missed.length ? ' Not found: ' + m.missed.join(', ') + ' (spelling?).' : '');
 }
 function withPref(f) { var p = APP.usePref ? prefOf() : null; return p ? Object.assign({}, f, { pref: p }) : f; }
@@ -1563,21 +1595,39 @@ function takeBackSchools(ids, done) {
     done();
   });
 }
-var SEARCH_WAIT = 450;   // ms after the last key before searching
+var SEARCH_WAIT = 350;   // ms after the last key before searching
+// The filter row is built once per mode, so the search box keeps what is typed (and the cursor) while results come.
+// Only the newest answer is shown (an older, slower answer is ignored).
+function searchBox(key, obj, run, ph) {
+  var qi = document.createElement('input');
+  qi.type = 'search'; qi.id = 'ffq'; qi.placeholder = ph; qi.value = obj.q || ''; qi.style.minWidth = '220px';
+  var go = function () { clearTimeout(APP.searchT); obj.q = qi.value.trim(); if (obj.limit) obj.limit = 25; searching(); run(); };
+  qi.addEventListener('input', function () { clearTimeout(APP.searchT); searching(); APP.searchT = setTimeout(go, SEARCH_WAIT); });
+  qi.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+  return qi;
+}
+function searching() { var st = document.getElementById('ffstate'); if (st) st.textContent = 'Searching…'; }
+function filterRow(mode) {
+  var ff = document.getElementById('ff');
+  if (ff.dataset.mode === mode) return ff;
+  ff.dataset.mode = mode;
+  ff.innerHTML = '<span id="ffsel" style="display:contents"></span>';
+  ff.appendChild(mode === 'groups' ? searchBox('q', GRP, runGroups, 'Vol number, school or village') : searchBox('q', FIND, runFind, 'School, village, UDISE or Vol number'));
+  var st = document.createElement('span'); st.className = 'small'; st.id = 'ffstate'; ff.appendChild(st);
+  return ff;
+}
 function runGroups() {
+  var seq = APP.searchSeq = (APP.searchSeq || 0) + 1;
   apiCall('groups', { filters: withPref(GRP) }).then(function (res) {
-    if (!document.getElementById('ff') || APP.assignMode !== 'groups') return;
+    if (seq !== APP.searchSeq || !document.getElementById('ff') || APP.assignMode !== 'groups') return;
+    var ff = filterRow('groups'), st = document.getElementById('ffstate'); if (st) st.textContent = '';
     if (!res.ok) { document.getElementById('flist').innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
     APP.grpRes = res; APP.findRes = null;
-    var ff = document.getElementById('ff');
-    ff.innerHTML = '<select data-g="taluk"><option value="">All taluks</option>' + res.taluks.map(function (t) { return '<option' + (t === GRP.taluk ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' +
-      '<select data-g="show">' + [['free', 'Free groups'], ['partly', 'Partly given'], ['given', 'Fully given'], ['all', 'All groups']].map(function (x) { return '<option value="' + x[0] + '"' + (GRP.show === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>' +
-      '<input type="search" data-g="q" placeholder="Vol number, school or village" value="' + esc(GRP.q) + '" style="min-width:220px">';
+    document.getElementById('ffsel').innerHTML = '<select data-g="taluk"><option value="">All taluks</option>' + res.taluks.map(function (t) { return '<option' + (t === GRP.taluk ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' +
+      '<select data-g="show">' + [['free', 'Free groups'], ['partly', 'Partly given'], ['given', 'Fully given'], ['all', 'All groups']].map(function (x) { return '<option value="' + x[0] + '"' + (GRP.show === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>';
     Array.prototype.forEach.call(ff.querySelectorAll('select[data-g]'), function (el) {
       el.addEventListener('change', function () { GRP[el.dataset.g] = el.value; GRP.limit = 25; document.getElementById('flist').innerHTML = '<p class="small">Loading…</p>'; runGroups(); });
     });
-    var qi = ff.querySelector('input[data-g=q]');
-    qi.addEventListener('input', function () { clearTimeout(APP.searchT); APP.searchT = setTimeout(function () { GRP.q = qi.value; GRP.limit = 25; runGroups(); }, SEARCH_WAIT); });
     drawGroups();
   });
 }
@@ -1608,19 +1658,19 @@ function drawGroups() {
   wireAssignButtons(drawGroups);
 }
 function runFind() {
+  var seq = APP.searchSeq = (APP.searchSeq || 0) + 1;
   apiCall('findSchools', { filters: withPref(FIND) }).then(function (res) {
-    if (!document.getElementById('ff') || APP.assignMode !== 'one') return;
+    if (seq !== APP.searchSeq || !document.getElementById('ff') || APP.assignMode !== 'one') return;
+    var ff = filterRow('one'), st = document.getElementById('ffstate'); if (st) st.textContent = '';
     if (!res.ok) { document.getElementById('flist').innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
     APP.findRes = res; APP.grpRes = null;
-    var ff = document.getElementById('ff');
     var opt = function (list, cur, all) { return '<option value="">' + all + '</option>' + list.map(function (x) { return '<option' + (x === cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join(''); };
-    ff.innerHTML =
+    document.getElementById('ffsel').innerHTML =
       '<select data-f="taluk">' + opt(res.taluks, FIND.taluk, 'All taluks') + '</select>' +
       '<select data-f="hobli">' + opt(res.hoblis, FIND.hobli, 'All hoblis') + '</select>' +
       '<select data-f="gp">' + opt(res.gps, FIND.gp, 'All GPs') + '</select>' +
       '<select data-f="show">' + [['', 'All schools'], ['free', 'Not given'], ['assigned', 'Given'], ['mine', APP.me.role === 'Admin' ? 'Given (any)' : 'My volunteers\''], ['notwilling', 'Not willing'], ['caution', 'Not ready or merged']]
-        .map(function (x) { return '<option value="' + x[0] + '"' + (FIND.show === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>' +
-      '<input type="search" data-f="q" placeholder="School, village, UDISE or Vol number" value="' + esc(FIND.q) + '" style="min-width:220px">';
+        .map(function (x) { return '<option value="' + x[0] + '"' + (FIND.show === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>';
     Array.prototype.forEach.call(ff.querySelectorAll('select[data-f]'), function (el) {
       el.addEventListener('change', function () {
         FIND[el.dataset.f] = el.value;
@@ -1630,8 +1680,6 @@ function runFind() {
         runFind();
       });
     });
-    var qi = ff.querySelector('input[data-f=q]');
-    qi.addEventListener('input', function () { clearTimeout(APP.searchT); APP.searchT = setTimeout(function () { FIND.q = qi.value; runFind(); }, SEARCH_WAIT); });
     drawFind();
   });
 }
@@ -1842,9 +1890,11 @@ function personCombo(boxId, people, current, onPick, label) {
   var box = document.getElementById(boxId);
   if (!box) return;
   var cur = people.filter(function (p) { return p.email === current; })[0] || null;
-  box.innerHTML = '<label class="f combo-wrap">' + esc(label || 'Person') + '<div class="combo"><input type="search" class="combo-in" autocomplete="off" placeholder="Type a name or email, or tap to see everyone" value="' + esc(cur ? cur.name : '') + '">' +
+  box.innerHTML = '<label class="f combo-wrap">' + esc(label || 'Person') + '<div class="combo"><input type="search" class="combo-in" autocomplete="off" placeholder="Tap to choose a person (type to search)" value="' + esc(cur ? cur.name : '') + '"><button type="button" class="combo-arrow" tabindex="-1" aria-label="Show the list">▾</button>' +
     '<div class="combo-list" role="listbox" hidden></div></div></label>';
   var input = box.querySelector('.combo-in'), list = box.querySelector('.combo-list');
+  box.querySelector('.combo-arrow').addEventListener('mousedown', function (e) { e.preventDefault(); if (document.activeElement === input && !list.hidden) { list.hidden = true; } else { input.focus(); draw(); } });
+  input.addEventListener('click', function () { if (list.hidden) draw(); });
   var draw = function () {
     var q = input.value.trim().toLowerCase();
     if (cur && input.value === cur.name) q = '';
