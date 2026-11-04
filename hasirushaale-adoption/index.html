@@ -11,8 +11,10 @@
    Data                : none is stored in this file. All data stays in
                          the Google Sheet. The sign-in key (Client ID) is
                          fetched from the backend, so it is not typed here.
-                         A half-filled visit form is kept on the phone only
-                         (until it is saved or discarded).
+                         A half-filled visit form is kept on the phone
+                         (until it is saved or discarded); half-filled
+                         short forms (call, update details, A4 note ...)
+                         are kept on the phone for 60 minutes.
 
    HOW TO CHANGE ONE PART
    Every section sits between a START line and an END line, e.g.
@@ -43,6 +45,7 @@
       P5.7  School details and Update details
       P5.8  Media (photos, audio, video)
       P5.9  Coordinator/admin box on the school page
+      P5.10 Half-filled short forms kept on the phone
     P6    Record your visit
       P6.1  The visit form
       P6.2  Form behaviour, draft on the phone, saving
@@ -55,6 +58,7 @@
       P7.5  Alerts block
       P7.6  Admin: coordinators
       P7.7  Corrections (approve or reject)
+      P7.8  Person picker (search inside the list)
     P8    Map tab
       P8.1  Map
     P10   Start-up
@@ -71,7 +75,7 @@
 <title>Hasiru Shaale · School adoption</title>
 
 <!-- ===== START P0.0 Version ===== -->
-<meta name="app-version" content="2026-11-04 v8">
+<meta name="app-version" content="2026-11-04 v9">
 <!-- ===== END P0.0 ===== -->
 
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -144,7 +148,9 @@ h4 { font-size: 15px; margin: 14px 0 6px; }
 .kv dt { font-size: 12px; color: var(--muted); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
 .kv .wide { grid-column: 1 / -1; }
+.kv-h { grid-column: 1 / -1; font-size: 13px; font-weight: 700; color: var(--accent); margin-top: 6px; border-bottom: 1px solid var(--line); }
 .old { font-size: 13px; color: var(--muted); }
+.pend { margin-top: 2px; font-size: 13px; }
 .phone { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
 select, input[type=search], input[type=text], input[type=date], input[type=number], input[type=email], textarea { font: inherit; font-size: 15px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); max-width: 100%; }
@@ -159,8 +165,8 @@ textarea { width: 100%; min-height: 70px; }
 .ticks label { display: flex; gap: 6px; align-items: center; font-size: 15px; color: var(--ink); }
 .box { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 10px; background: var(--surface); }
 .box h4 { margin-top: 0; }
-.defs { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; font-size: 13px; color: var(--muted); margin-top: 8px; }
-.defs b { color: var(--ink); }
+.def { font-size: 13px; color: var(--muted); line-height: 1.4; }
+.def b { color: var(--ink); }
 .section-h { font-size: 17px; font-weight: 700; color: var(--accent); margin: 18px 0 6px; padding-bottom: 4px; border-bottom: 2px solid var(--accent); }
 .act-row { display: grid; grid-template-columns: 120px 1fr 80px 70px 70px 90px 90px; gap: 6px; margin-bottom: 6px; }
 .act-head { font-size: 12px; color: var(--muted); }
@@ -199,6 +205,13 @@ tr.click:hover td { background: var(--surface-2); }
 .group.free { border-left: 4px solid var(--accent); }
 .group.partly { border-left: 4px solid var(--warn); }
 .crumbs { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; font-size: 14px; }
+.combo-wrap { flex: 1; min-width: 240px; }
+.combo { position: relative; }
+.combo-in { width: 100%; }
+.combo-list { position: absolute; left: 0; right: 0; top: calc(100% + 2px); z-index: 1500; max-height: 320px; overflow-y: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.18); }
+.combo-item { display: block; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.combo-item:hover, .combo-item:focus { background: var(--surface-2); }
+.combo-item .small { font-size: 12px; }
 #map { height: calc(100vh - 260px); min-height: 380px; border-radius: 12px; border: 1px solid var(--line); }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); margin: 8px 0; }
 .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; vertical-align: -1px; margin-right: 4px; }
@@ -248,6 +261,12 @@ function apiCall(action, data) {
       return { ok: false, error: 'Could not reach the server. Check the internet and try again.' };
     });
 }
+// After a save, the server's short-term memory is filled again in the background,
+// so the next screen opens quickly. Nobody waits for it.
+function warmSoon() {
+  clearTimeout(APP.warmT);
+  APP.warmT = setTimeout(function () { apiCall('warm'); }, 1500);
+}
 /* ===== END P3.1 ===== */
 
 /* ===== START P3.2 Google sign-in ===== */
@@ -279,7 +298,7 @@ function onSignedIn(resp) {
   loadMe();
 }
 function signOut(message) {
-  APP.token = ''; APP.me = null;
+  APP.token = ''; APP.me = null; APP.pages = {}; APP.mySchools = null;
   if (!APP.clientId) {
     apiCall('config').then(function (res) { APP.clientId = res.clientId || ''; signOut(message); });
     return;
@@ -293,7 +312,8 @@ function loadMe() {
   apiCall('me').then(function (res) {
     if (!res.ok) { signOut(res.error); return; }
     APP.me = res.person; APP.settings = res.settings || {};
-    APP.preSchools = res.schools || null;            // My schools come with the sign-in, saving one wait
+    APP.mySchools = res.schools || null;             // My schools come with the sign-in, saving one wait
+    APP.preSchools = true;
     if (res.clientId) APP.clientId = res.clientId;
     document.getElementById('top').hidden = false;
     document.getElementById('who-name').textContent = res.person.name + ' · ' + res.person.role;
@@ -311,6 +331,7 @@ var WORDS = {
   noOwnSchools: 'You have no schools of your own. This tab shows only the schools you adopt yourself. Your volunteers\' schools are in the Coordinator tab.',
   caution: 'Not ready or merged: take care before assigning',
   notWilling: 'School not willing to support',
+  readOnly: 'You are only viewing this school. To work on it, give it to one of your volunteers (or to yourself) in Assignments.',
   firstTitle: 'First thing on arrival',
   firstHelp: 'Reminders only. Do them when you are at the school.',
   locTitle: 'School location',
@@ -336,7 +357,8 @@ var WORDS = {
   },
   plantedTooMany: 'Planted is more than the number given. Check the numbers, or correct our record of saplings given.',
   updateTitle: 'Update details',
-  updateHelp: 'Propose the correct value. Your coordinator or the office approves it; until then the old value stays and both are shown.',
+  updateHelp: 'Propose the correct value. Your coordinator or the office approves it. Until then the present value stays on the card, with your proposal shown under it.',
+  kept: 'Your unsaved entries were brought back from this phone.',
   mediaTitle: 'Photos, audio and video',
   alertsTitle: 'Needs attention',
   notWillingList: 'Schools not willing to support'
@@ -344,29 +366,38 @@ var WORDS = {
 /* ===== END P4.1 ===== */
 
 /* ===== START P5.1 My schools (list) ===== */
+// The list shows at once from memory; a fresh copy is fetched quietly and shown if anything changed.
 function screenMySchools() {
-  setMain('<h2>' + WORDS.mySchools + '</h2><p class="small">Loading your schools…</p>');
-  var ready = APP.preSchools ? Promise.resolve({ ok: true, schools: APP.preSchools }) : apiCall('mySchools');
+  var fromSignIn = APP.preSchools && APP.mySchools;
   APP.preSchools = null;
-  ready.then(function (res) {
-    if (!res.ok) { setMain('<div class="msg bad">' + esc(res.error) + '</div>'); return; }
-    var list = res.schools || [];
-    var h = '<h2>' + WORDS.mySchools + '</h2>';
-    if (!list.length) { setMain(h + '<div class="card">' + (APP.me.role === 'Volunteer' ? WORDS.noSchools : WORDS.noOwnSchools) + '</div>'); return; }
-    h += '<p class="small">' + list.length + ' school' + (list.length === 1 ? '' : 's') + ' adopted. Tap a school to open it.</p><div class="stack">';
-    list.forEach(function (s, i) {
-      h += '<button type="button" class="card school-btn' + (s.caution ? ' caution' : '') + '" data-open="' + s.id + '">' +
-        '<h3><span class="sl">' + (i + 1) + '.</span>' + esc(s.name) + '</h3>' +
-        '<div class="small">' + esc([s.taluk, s.hobli, s.gp, s.village].filter(String).join(' · ')) + '</div>' +
-        '<div style="margin-top:6px">' + (s.caution ? chip(WORDS.caution, 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') +
-        dueChips(s) +
-        chip(s.location ? 'Location saved' : 'Location not saved yet', s.location ? 'good' : 'warn') +
-        chip(s.frontPhoto ? 'Front photo saved' : 'Front photo not taken yet', s.frontPhoto ? 'good' : 'warn') + '</div></button>';
-    });
-    setMain(h + '</div>');
-    Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) {
-      b.addEventListener('click', function () { openSchoolFrom(b.dataset.open); });
-    });
+  if (APP.mySchools) drawMySchools(APP.mySchools);
+  else setMain('<h2>' + WORDS.mySchools + '</h2><p class="small">Loading your schools…</p>');
+  if (fromSignIn) return;
+  apiCall('mySchools').then(function (res) {
+    var here = APP.where.top === 'vol' && !APP.where.sub;
+    if (!res.ok) { if (here && !APP.mySchools) setMain('<div class="msg bad">' + esc(res.error) + '</div>'); return; }
+    var changed = JSON.stringify(res.schools) !== JSON.stringify(APP.mySchools);
+    APP.mySchools = res.schools || [];
+    if (here && changed) drawMySchools(APP.mySchools);
+  });
+}
+function drawMySchools(list) {
+  var h = '<h2>' + WORDS.mySchools + '</h2>';
+  if (!list.length) { setMain(h + '<div class="card">' + (APP.me.role === 'Volunteer' ? WORDS.noSchools : WORDS.noOwnSchools) + '</div>'); return; }
+  h += '<p class="small">' + list.length + ' school' + (list.length === 1 ? '' : 's') + ' adopted. Tap a school to open it.</p><div class="stack">';
+  list.forEach(function (s, i) {
+    h += '<button type="button" class="card school-btn' + (s.caution ? ' caution' : '') + '" data-open="' + s.id + '">' +
+      '<h3><span class="sl">' + (i + 1) + '.</span>' + esc(s.name) + '</h3>' +
+      '<div class="small">' + esc([s.taluk, s.hobli, s.gp, s.village].filter(String).join(' · ')) + '</div>' +
+      (s.officeNote ? '<div class="small" style="margin-top:4px;color:var(--warn)">📌 ' + esc(s.officeNote) + '</div>' : '') +
+      '<div style="margin-top:6px">' + (s.caution ? chip(WORDS.caution, 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') +
+      dueChips(s) +
+      chip(s.location ? 'Location saved' : 'Location not saved yet', s.location ? 'good' : 'warn') +
+      chip(s.frontPhoto ? 'Front photo saved' : 'Front photo not taken yet', s.frontPhoto ? 'good' : 'warn') + '</div></button>';
+  });
+  setMain(h + '</div>');
+  Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) {
+    b.addEventListener('click', function () { openSchoolFrom(b.dataset.open); });
   });
 }
 // "Last visit", "Visit due" and "Call due" (the numbers of days are in the Settings tab).
@@ -380,35 +411,96 @@ function dueChips(s) {
   if (call !== null && call > (APP.settings.callDueDays || 30)) h += chip('Call due', 'warn');
   return h;
 }
+// After a save on the school page, the same school in My schools is updated too (no loading).
+function syncListItem(s) {
+  (APP.mySchools || []).forEach(function (x) {
+    if (String(x.id) !== String(s.id)) return;
+    ['location', 'frontPhoto', 'notWilling', 'lastVisit', 'lastCall', 'pending', 'bookGiven'].forEach(function (k) { x[k] = s[k]; });
+  });
+}
 /* ===== END P5.1 ===== */
 
 /* ===== START P5.2 School page ===== */
 // One school, opened from My schools (#vol/school/12) or from the other tabs (#admin/school/12, #coord/school/12).
+// A school opened before shows at once from memory; a fresh copy is fetched quietly and shown
+// only if something changed and nobody is typing. Saving never reloads the page: only the box changes.
+var PAGE_KEEP_MS = 10 * 60 * 1000;
 function screenSchool(id, backHash) {
   var goBack = function () { location.hash = backHash; };
-  setMain('<button class="btn sm back" type="button" id="back">← Back</button><p class="small">Loading the school…</p>');
-  document.getElementById('back').addEventListener('click', goBack);
-  apiCall('school', { schoolId: id }).then(function (res) {
-    if (!res.ok) { setMain('<button class="btn sm back" type="button" id="back">← Back</button><div class="msg bad">' + esc(res.error) + '</div>'); document.getElementById('back').addEventListener('click', goBack); return; }
-    var s = res.school; APP.school = s; APP.backTo = backHash;
-    var h = '<button class="btn sm back" type="button" id="back">← Back</button>';
-    h += '<h2>' + esc(s.name) + '</h2>';
-    h += '<div>' + (s.caution ? chip(WORDS.caution, 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling + (s.first.notWillingReason ? ': ' + s.first.notWillingReason : ''), 'bad') : '') +
-         (s.group ? chip('Vol ' + s.groupNo) : '') + chip(s.activity || '-') + (s.assignedTo && s.assignedTo !== APP.me.email ? chip('With ' + (s.assignedName || s.assignedTo)) : '') + '</div>';
-    h += '<div class="stack" style="margin-top:12px">';
-    if (s.canManage) h += '<div class="card" id="managebox">' + manageBox(s) + '</div>';
-    h += '<div class="card first" id="firstbox">' + firstBox(s) + '</div>';
-    h += '<div class="card" id="formbox">' + formBox(s) + '</div>';
-    h += '<div class="card" id="callbox">' + callBox(s) + '</div>';
-    h += '<div class="card" id="visitbox">' + visitBox(s) + '</div>';
-    h += '<div class="card" id="mediabox">' + mediaBox(s) + '</div>';
-    h += '<div class="card" id="detailsbox">' + detailsBox(s) + '</div>';
-    h += '</div>';
-    setMain(h);
+  var mem = APP.pages[id];
+  if (mem && Date.now() - mem.t < PAGE_KEEP_MS) drawSchool(mem.s, backHash);
+  else {
+    setMain('<button class="btn sm back" type="button" id="back">← Back</button><p class="small">Loading the school…</p>');
     document.getElementById('back').addEventListener('click', goBack);
-    wireFirst(); wireForm(); wireCall(); wireVisitBox(); wireMedia(); wireDetails();
-    if (s.canManage) wireManage();
+  }
+  apiCall('school', { schoolId: id }).then(function (res) {
+    var here = APP.where.sub === 'school' && String((location.hash.split('/')[2] || '')) === String(id);
+    if (!res.ok) {
+      if (here && !mem) { setMain('<button class="btn sm back" type="button" id="back">← Back</button><div class="msg bad">' + esc(res.error) + '</div>'); document.getElementById('back').addEventListener('click', goBack); }
+      return;
+    }
+    var old = APP.pages[id], changed = !old || JSON.stringify(old.s) !== JSON.stringify(res.school);
+    if (!here) { APP.pages[id] = { s: res.school, t: Date.now() }; return; }
+    if (!mem || (changed && !isEditing())) { APP.pages[id] = { s: res.school, t: Date.now() }; drawSchool(res.school, backHash); }
+    else if (!changed) APP.pages[id].t = Date.now();
   });
+}
+// true while the person is filling something on the school page
+function isEditing() {
+  var a = document.activeElement;
+  return !!document.querySelector('#vform, #callform:not([hidden]), #updform:not([hidden]), #nwform:not([hidden]), #locreason:not([hidden]), #mpick:not([hidden])') ||
+    (APP.a4files && APP.a4files.length > 0) || !!(a && /INPUT|TEXTAREA|SELECT/.test(a.tagName));
+}
+function schoolChips(s) {
+  return (s.caution ? chip(WORDS.caution, 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling + (s.first && s.first.notWillingReason ? ': ' + s.first.notWillingReason : ''), 'bad') : '') +
+    (s.group ? chip('Vol ' + s.groupNo) : '') + chip(s.activity || '-') +
+    (s.assignedTo === 'Taken' ? chip('Given to another volunteer') : s.assignedTo && s.assignedTo !== APP.me.email ? chip('With ' + (s.assignedName || s.assignedTo)) : !s.assignedTo ? chip('Not given yet') : '');
+}
+function drawSchool(s, backHash) {
+  APP.school = s; APP.backTo = backHash; APP.a4files = [];
+  APP.pages[s.id] = APP.pages[s.id] || { s: s, t: Date.now() };
+  var h = '<button class="btn sm back" type="button" id="back">← Back</button>';
+  h += '<h2>' + esc(s.name) + '</h2><div id="schoolchips">' + schoolChips(s) + '</div>';
+  h += '<div class="stack" style="margin-top:12px">';
+  if (s.officeNote) h += '<div class="msg warn" id="officenote"><b>📌 Note from the office</b><div style="white-space:pre-line">' + esc(s.officeNote) + '</div></div>';
+  if (s.readOnly) {
+    h += '<div class="msg">' + WORDS.readOnly + '</div><div class="card" id="detailsbox">' + detailsBox(s) + '</div></div>';
+    setMain(h);
+    document.getElementById('back').addEventListener('click', function () { location.hash = backHash; });
+    return;
+  }
+  h += '<div class="card" id="detailsbox">' + detailsBox(s) + '</div>';
+  if (s.canManage) h += '<div class="card" id="managebox">' + manageBox(s) + '</div>';
+  h += '<div class="card first" id="firstbox">' + firstBox(s) + '</div>';
+  h += '<div class="card" id="formbox">' + formBox(s) + '</div>';
+  h += '<div class="card" id="callbox">' + callBox(s) + '</div>';
+  h += '<div class="card" id="visitbox">' + visitBox(s) + '</div>';
+  h += '<div class="card" id="mediabox">' + mediaBox(s) + '</div>';
+  h += '</div>';
+  setMain(h);
+  document.getElementById('back').addEventListener('click', function () { location.hash = backHash; });
+  wireDetails(); wireFirst(); wireForm(); wireCall(); wireVisitBox(); wireMedia();
+  if (s.canManage) wireManage();
+  keepRestore();
+}
+// Redraws only the named boxes from what the page already knows (after a save). No loading.
+var BOXES = {
+  firstbox: function () { return [firstBox, wireFirst]; }, formbox: function () { return [formBox, wireForm]; },
+  callbox: function () { return [callBox, wireCall]; }, visitbox: function () { return [visitBox, wireVisitBox]; },
+  mediabox: function () { return [mediaBox, wireMedia]; }, detailsbox: function () { return [detailsBox, wireDetails]; },
+  managebox: function () { return [manageBox, wireManage]; }
+};
+function redraw(ids, noSave) {
+  var s = APP.school;
+  ids.forEach(function (id) {
+    var el = document.getElementById(id), fns = BOXES[id] && BOXES[id]();
+    if (!el || !fns) return;
+    el.innerHTML = fns[0](s); fns[1]();
+  });
+  var c = document.getElementById('schoolchips'); if (c) c.innerHTML = schoolChips(s);
+  APP.pages[s.id] = { s: s, t: Date.now() };
+  syncListItem(s);
+  if (!noSave) warmSoon();
 }
 /* ===== END P5.2 ===== */
 
@@ -422,7 +514,7 @@ function firstBox(s) {
   if (f.location) {
     h += chip('Saved ' + f.locationDate, 'good') + '<div style="margin-top:6px"><a class="btn sm" href="' + esc(f.location) + '" target="_blank" rel="noopener">Open in Google Maps</a></div>' +
          '<div style="text-align:right;margin-top:6px"><button class="link small" type="button" id="locchange">Change location</button></div>' +
-         '<div id="locreason" hidden><label class="f" style="margin-top:6px">Why are you changing it?<input type="text" id="locwhy" placeholder="For example: the first pin was on the road"></label>' +
+         '<div id="locreason" hidden><label class="f" style="margin-top:6px">Why are you changing it?<input type="text" id="locwhy" data-keep="loc.why" placeholder="For example: the first pin was on the road"></label>' +
          '<button class="btn sm primary" type="button" id="locgo" style="margin-top:6px">📍 Save my current location</button></div>';
   } else {
     h += '<p class="small">Stand at the school gate and tap the button.</p><button class="btn primary" type="button" id="locgo">📍 Save my current location</button>';
@@ -454,10 +546,13 @@ function wireFirst() {
     if (!navigator.geolocation) { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">This phone cannot share its location.</div>'; return; }
     go.disabled = true; go.textContent = 'Finding your location…';
     navigator.geolocation.getCurrentPosition(function (pos) {
+      go.textContent = 'Saving…';
       apiCall('saveLocation', { schoolId: s.id, lat: pos.coords.latitude, lng: pos.coords.longitude, reason: why ? why.value : '' }).then(function (res) {
         if (!res.ok) { go.disabled = false; go.textContent = '📍 Save my current location'; msg.innerHTML = '<div class="msg bad" style="margin-top:6px">' + esc(res.error) + '</div>'; return; }
+        s.first.location = res.link; s.first.locationDate = res.date || 'today'; s.location = res.link;
+        keepClear('loc');
         toast('Location saved (within about ' + Math.round(pos.coords.accuracy) + ' m).');
-        route();
+        redraw(['firstbox']);
       });
     }, function (err) {
       go.disabled = false; go.textContent = '📍 Save my current location';
@@ -473,14 +568,18 @@ function wireFirst() {
       return apiCall('saveFrontPhoto', { schoolId: s.id, data: f.data });
     }).then(function (res) {
       if (!res.ok) { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">' + esc(res.error) + '</div>'; return; }
-      toast('Front photo saved.'); route();
+      s.first.photo = res.link || 'saved'; s.first.photoDate = res.date || 'today'; s.frontPhoto = s.first.photo;
+      toast('Front photo saved.'); redraw(['firstbox']);
     });
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-book]'), function (b) {
     b.addEventListener('click', function () {
+      b.disabled = true;
       apiCall('saveBook', { schoolId: s.id, value: b.dataset.book }).then(function (res) {
+        b.disabled = false;
         if (!res.ok) { document.getElementById('bookmsg').innerHTML = '<div class="msg bad" style="margin-top:6px">' + esc(res.error) + '</div>'; return; }
-        toast('Saved.'); route();
+        s.first.book = b.dataset.book; s.first.bookDate = res.date || 'today'; s.bookGiven = b.dataset.book;
+        toast('Saved.'); redraw(['firstbox']);
       });
     });
   });
@@ -492,11 +591,11 @@ function formBox(s) {
   var h = '<h3>📄 ' + WORDS.formTitle + '</h3><p class="small">' + WORDS.formHelp + '</p>' +
     '<a class="btn" href="' + CONFIG.A4_FORM_FILE + '" download>⬇ Download the A4 form</a>' +
     '<div class="line"></div><b>Upload the filled form</b>' +
-    '<div class="form"><label>Date of the visit<input type="date" id="a4date" value="' + todayIST() + '" max="' + todayIST() + '"></label></div>' +
+    '<div class="form"><label>Date of the visit<input type="date" id="a4date" data-keep="a4.date" value="' + todayIST() + '" max="' + todayIST() + '"></label></div>' +
     '<label class="btn primary">📷 Take or choose photos<input type="file" id="a4files" accept="image/*,application/pdf" multiple hidden></label>' +
     '<span class="small" id="a4count" style="margin-left:8px">No photo chosen (up to 5)</span>' +
     '<div class="thumbs" id="a4thumbs"></div>' +
-    '<label class="f" style="margin-top:8px">Note for the office (optional)<input type="text" id="a4note" placeholder="For example: photo 2 is the back side"></label>' +
+    '<label class="f" style="margin-top:8px">Note for the office (optional)<input type="text" id="a4note" data-keep="a4.note" placeholder="For example: photo 2 is the back side"></label>' +
     '<div id="a4msg"></div><button class="btn primary" id="a4send" type="button" style="margin-top:10px">Upload</button>';
   if (s.a4 && s.a4.length) {
     h += '<p class="small" style="margin:14px 0 4px"><b>Uploaded for this school</b></p>' + s.a4.map(function (u) {
@@ -532,7 +631,11 @@ function wireForm() {
       .then(function (res) {
         btn.disabled = false; btn.textContent = 'Upload';
         if (!res.ok) { msg.innerHTML = '<div class="msg bad" style="margin-top:10px">' + esc(res.error) + '</div>'; return; }
-        toast(WORDS.formDone); route();
+        s.a4 = s.a4 || [];
+        s.a4.unshift({ visitDate: niceDate(date), files: res.files, by: APP.me.email, entered: false, id: res.id, links: res.links || [] });
+        if (!s.lastVisit || date > s.lastVisit) s.lastVisit = date;
+        APP.a4files = []; keepClear('a4');
+        toast(WORDS.formDone); redraw(['formbox']);
       });
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-entera4]'), function (b) {
@@ -548,16 +651,16 @@ function wireForm() {
 /* ===== START P5.5 Call log ===== */
 function callBox(s) {
   var h = '<h3>📞 ' + WORDS.callTitle + '</h3><div class="msg warn">' + WORDS.callHelp + '</div>' +
-    '<dl class="kv"><div><dt>Head master or principal</dt><dd>' + esc(s.hmName || '-') + phoneLine(s.hmPhone) + pendingPhone(s, 'hmPhone') + '</dd></div>' +
-    (s.altName || s.altPhone ? '<div><dt>Alternative contact</dt><dd>' + esc(s.altName || '-') + phoneLine(s.altPhone) + pendingPhone(s, 'altPhone') + '</dd></div>' : '') + '</dl>' +
+    '<dl class="kv"><div><dt>Head master or principal</dt><dd>' + esc(s.hmName || '-') + (phoneLine(s.hmPhone) || '<div>-</div>') + pendingPhone(s, 'hmPhone') + '</dd></div>' +
+    '<div><dt>Alternative contact</dt><dd>' + esc(s.altName || '-') + (phoneLine(s.altPhone) || '<div>-</div>') + pendingPhone(s, 'altPhone') + '</dd></div></dl>' +
     '<button class="btn" type="button" id="callopen" style="margin-top:12px">+ Log a call</button>' +
     '<div id="callform" hidden><div class="form">' +
-    '<label>Date of the call<input type="date" id="cdate" value="' + todayIST() + '" max="' + todayIST() + '"></label>' +
-    '<label>Who did you speak to?<select id="cwho">' + opts(s.lists.callWho) + '</select><input type="text" id="cwhoo" placeholder="Who?" hidden></label>' +
-    '<label>How did the call go?<select id="chow">' + opts(s.lists.callHow) + '</select><input type="text" id="chowo" placeholder="What happened?" hidden></label>' +
-    '<label>Next visit planned (optional)<input type="date" id="cnext" min="' + todayIST() + '"></label>' +
-    '<label class="wide">Notes<textarea id="cnotes" placeholder="Anything worth noting"></textarea></label>' +
-    '<label class="check wide"><input type="checkbox" id="cnot"> <span><b>' + WORDS.notWilling + '</b><br><span class="small">Write the reason in the notes.</span></span></label>' +
+    '<label>Date of the call<input type="date" id="cdate" data-keep="call.date" value="' + todayIST() + '" max="' + todayIST() + '"></label>' +
+    '<label>Who did you speak to?<select id="cwho" data-keep="call.who">' + opts(s.lists.callWho) + '</select><input type="text" id="cwhoo" data-keep="call.whoo" placeholder="Who?" hidden></label>' +
+    '<label>How did the call go?<select id="chow" data-keep="call.how">' + opts(s.lists.callHow) + '</select><input type="text" id="chowo" data-keep="call.howo" placeholder="What happened?" hidden></label>' +
+    '<label>Next visit planned (optional)<input type="date" id="cnext" data-keep="call.next" min="' + todayIST() + '"></label>' +
+    '<label class="wide">Notes<textarea id="cnotes" data-keep="call.notes" placeholder="Anything worth noting"></textarea></label>' +
+    '<label class="check wide"><input type="checkbox" id="cnot" data-keep="call.not"> <span><b>' + WORDS.notWilling + '</b><br><span class="small">Write the reason in the notes.</span></span></label>' +
     '</div><div id="cmsg"></div><button class="btn primary" type="button" id="csave">Save call</button> <button class="btn" type="button" id="ccancel">Cancel</button></div>';
   if (s.calls && s.calls.length) {
     h += '<p class="small" style="margin:14px 0 4px"><b>Recent calls</b></p>' + s.calls.map(function (c) {
@@ -572,10 +675,11 @@ function pendingPhone(s, prop) {
   var p = s.pending && s.pending[prop];
   return p ? '<div class="small">New number proposed (waiting for approval):</div>' + phoneLine(p.value) : '';
 }
+function openCallForm() { var f = document.getElementById('callform'), o = document.getElementById('callopen'); if (f) f.hidden = false; if (o) o.hidden = true; }
 function wireCall() {
   var s = APP.school;
-  document.getElementById('callopen').addEventListener('click', function () { document.getElementById('callform').hidden = false; this.hidden = true; });
-  document.getElementById('ccancel').addEventListener('click', function () { document.getElementById('callform').hidden = true; document.getElementById('callopen').hidden = false; });
+  document.getElementById('callopen').addEventListener('click', openCallForm);
+  document.getElementById('ccancel').addEventListener('click', function () { keepClear('call'); redraw(['callbox'], true); });
   [['cwho', 'cwhoo'], ['chow', 'chowo']].forEach(function (p) {
     document.getElementById(p[0]).addEventListener('change', function () { document.getElementById(p[1]).hidden = this.value !== 'Other'; });
   });
@@ -586,11 +690,17 @@ function wireCall() {
     var not = document.getElementById('cnot').checked;
     if (not && !v('cnotes').trim()) { msg.innerHTML = '<div class="msg bad">Write the reason the school is not willing, in the notes.</div>'; return; }
     btn.disabled = true; btn.textContent = 'Saving…';
-    apiCall('saveCall', { schoolId: s.id, date: v('cdate'), who: v('cwho'), whoOther: v('cwhoo'), how: v('chow'), howOther: v('chowo'),
-                          next: v('cnext'), notes: v('cnotes'), notWilling: not }).then(function (res) {
+    var call = { schoolId: s.id, date: v('cdate'), who: v('cwho'), whoOther: v('cwhoo'), how: v('chow'), howOther: v('chowo'), next: v('cnext'), notes: v('cnotes'), notWilling: not };
+    apiCall('saveCall', call).then(function (res) {
       btn.disabled = false; btn.textContent = 'Save call';
       if (!res.ok) { msg.innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
-      toast('Call saved.'); route();
+      s.calls = s.calls || [];
+      s.calls.unshift({ date: niceDate(call.date), who: call.who, whoOther: call.whoOther, how: call.how, howOther: call.howOther, notWilling: not,
+                        notes: call.notes, next: call.next ? niceDate(call.next) : '', by: APP.me.email });
+      if (!s.lastCall || call.date > s.lastCall) s.lastCall = call.date;
+      if (not) { s.notWilling = true; s.first.notWillingReason = call.notes; }
+      keepClear('call');
+      toast('Call saved.'); redraw(['callbox', 'managebox']);
     });
   });
 }
@@ -634,38 +744,43 @@ function niceDate(d) {
 /* ===== END P5.6 ===== */
 
 /* ===== START P5.7 School details and Update details ===== */
-// While a correction waits for approval, the new value is shown with "Old: ..." under it.
+// The card shows the present value. While a correction waits for approval, the proposed
+// value is shown under it ("Proposed: ... waiting for approval"); after approval the card shows the new value.
 function detailsBox(s) {
-  var given = [];
-  if (s.saplings) given.push(fmtN(s.saplings) + ' saplings');
-  if (s.seeds) given.push(fmtN(s.seeds) + ' seeds');
   var P = function (label, prop, value) {
+    var cur = (value === '' || value === null || value === undefined) ? '-' : value;
     var p = s.pending && s.pending[prop];
-    if (!p) return kv(label, value);
-    return '<div><dt>' + esc(label) + '</dt><dd>' + esc(p.value) + ' ' + chip('waiting for approval', 'warn') + '<div class="old">Old: ' + esc(p.old || '-') + '</div></dd></div>';
+    if (!p) return kv(label, cur);
+    return '<div><dt>' + esc(label) + '</dt><dd>' + esc(cur) + '<div class="pend">' + chip('Proposed: ' + fmtMaybe(p.value), 'warn') + '<span class="small">waiting for approval</span></div></dd></div>';
   };
+  var head = function (t) { return '<div class="kv-h">' + esc(t) + '</div>'; };
   var h = '<h3>School details</h3><dl class="kv">' +
-    P('Taluk', 'taluk', s.taluk) + P('Hobli', 'hobli', s.hobli) + P('Gram panchayat (GP)', 'gp', s.gp) + P('Village', 'village', s.village) +
-    P('Students', 'students', s.students === null ? '-' : fmtN(s.students)) + P('UDISE code', 'udise', s.udise) + P('School name', 'name', s.name) +
-    P('Saplings given (Phase 1)', 'saplings', s.saplings ? fmtN(s.saplings) : '-') + P('Seeds given (Phase 1)', 'seeds', s.seeds ? fmtN(s.seeds) : '-') +
+    head('Place') + P('Taluk', 'taluk', s.taluk) + P('Hobli', 'hobli', s.hobli) + P('Gram panchayat (GP)', 'gp', s.gp) + P('Village', 'village', s.village) +
+    head('School') + P('School name', 'name', s.name) + P('UDISE code', 'udise', s.udise) + P('Students', 'students', s.students === null ? '' : fmtN(s.students)) +
+    head('Contacts') + P('Head master or principal', 'hmName', s.hmName) + P('HM / principal number', 'hmPhone', s.hmPhone) +
+    P('Alternative contact', 'altName', s.altName) + P('Alternative contact number', 'altPhone', s.altPhone) +
+    head('Phase 1') + P('Saplings given', 'saplings', s.saplings ? fmtN(s.saplings) : '') + P('Seeds given', 'seeds', s.seeds ? fmtN(s.seeds) : '') +
     kv('Date of first visit', s.firstVisit) + kv('1st visit volunteer', s.firstVol) +
     (s.species ? '<div class="wide"><dt>Species and remarks</dt><dd class="small">' + esc(s.species) + '</dd></div>' : '') +
     (s.pending && s.pending.saplings && s.pending.saplings.species ? '<div class="wide"><dt>Species proposed (waiting for approval)</dt><dd class="small">' + esc(s.pending.saplings.species) + '</dd></div>' : '') +
     (s.pending && s.pending.other ? '<div class="wide"><dt>Other change proposed (waiting)</dt><dd class="small">' + esc(s.pending.other.old) + ': ' + esc(s.pending.other.value) + '</dd></div>' : '') +
     '</dl>';
+  if (s.readOnly) return h;
   h += '<div class="right" style="margin-top:10px"><button class="link" type="button" id="updopen">Something wrong? Update details</button></div>';
   h += '<div id="updform" hidden><div class="line"></div><h3>' + WORDS.updateTitle + '</h3><p class="small">' + WORDS.updateHelp + '</p>' +
-    '<div class="form"><label>What is wrong?<select id="ufield"><option value="">Choose…</option>' +
+    '<div class="form"><label>What is wrong?<select id="ufield" data-keep="upd.field"><option value="">Choose…</option>' +
     s.corrFields.map(function (f) { return '<option value="' + esc(f.key) + '">' + esc(f.label) + '</option>'; }).join('') + '</select></label>' +
-    '<label id="uwhatl" hidden>What is it about?<input type="text" id="uwhat" placeholder="For example: second phone number"></label>' +
-    '<label id="uvall">Correct value<input type="text" id="uval"></label></div>' +
+    '<label id="uwhatl" hidden>What is it about?<input type="text" id="uwhat" data-keep="upd.what" placeholder="For example: second phone number"></label>' +
+    '<label id="uvall">Correct value<input type="text" id="uval" data-keep="upd.value"></label></div>' +
     '<div id="uspecies" hidden><p class="small">Enter the saplings species by species. The total is worked out for you.</p><div id="usprows"></div>' +
     '<button class="btn sm" type="button" id="uspadd">+ Add a species</button> <span class="small" id="usptotal"></span></div>' +
     '<div id="umsg"></div><div style="margin-top:10px"><button class="btn primary" type="button" id="usave">Send for approval</button> <button class="btn" type="button" id="ucancel">Cancel</button></div></div>';
   return h;
 }
+function fmtMaybe(v) { return typeof v === 'number' ? fmtN(v) : v; }
 function wireDetails() {
   var s = APP.school;
+  if (s.readOnly || !document.getElementById('updopen')) return;
   var spRow = function () {
     var d = document.createElement('div'); d.className = 'form'; d.style.margin = '4px 0';
     d.innerHTML = '<label>Species<select data-sp="kind"><option value="">Choose…</option>' + s.kinds.map(function (k) { return '<option>' + esc(k) + '</option>'; }).join('') + '</select></label>' +
@@ -678,7 +793,7 @@ function wireDetails() {
     document.getElementById('usptotal').textContent = 'Total: ' + t;
   };
   document.getElementById('updopen').addEventListener('click', function () { openUpdate(''); });
-  document.getElementById('ucancel').addEventListener('click', function () { document.getElementById('updform').hidden = true; });
+  document.getElementById('ucancel').addEventListener('click', function () { keepClear('upd'); redraw(['detailsbox'], true); });
   document.getElementById('uspadd').addEventListener('click', spRow);
   document.getElementById('ufield').addEventListener('change', function () {
     var f = this.value;
@@ -687,7 +802,7 @@ function wireDetails() {
     document.getElementById('uvall').hidden = f === 'Saplings Count';
     if (f === 'Saplings Count' && !document.querySelector('[data-sp]')) { spRow(); spRow(); spRow(); }
     var cur = (s.corrFields.filter(function (x) { return x.key === f; })[0] || {}).prop;
-    document.getElementById('uval').placeholder = cur && s[cur] !== null && s[cur] !== undefined ? 'Now: ' + s[cur] : '';
+    document.getElementById('uval').placeholder = cur && s[cur] !== null && s[cur] !== undefined && s[cur] !== '' ? 'Now: ' + s[cur] : '';
   });
   document.getElementById('usave').addEventListener('click', function () {
     var btn = this, msg = document.getElementById('umsg'), f = document.getElementById('ufield').value;
@@ -703,17 +818,20 @@ function wireDetails() {
     apiCall('propose', { schoolId: s.id, field: f, value: document.getElementById('uval').value, what: document.getElementById('uwhat').value, species: species }).then(function (res) {
       btn.disabled = false; btn.textContent = 'Send for approval';
       if (!res.ok) { msg.innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
-      toast('Sent for approval. The old value stays until it is approved.');
-      route();
+      s.pending = res.pending || s.pending;
+      keepClear('upd');
+      toast('Sent for approval. The present value stays until it is approved.');
+      redraw(['detailsbox', 'callbox']);
     });
   });
 }
 // Opens Update details (optionally on one field) and scrolls to it.
-function openUpdate(field) {
+function openUpdate(field, noScroll) {
   var box = document.getElementById('updform');
+  if (!box) return;
   box.hidden = false;
   if (field) { var sel = document.getElementById('ufield'); sel.value = field; sel.dispatchEvent(new Event('change')); }
-  document.getElementById('detailsbox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (!noScroll) document.getElementById('detailsbox').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 /* ===== END P5.7 ===== */
 
@@ -749,7 +867,9 @@ function wireMedia() {
     apiCall('saveMedia', { schoolId: s.id, data: picked.data, type: picked.type, name: picked.name, explanation: document.getElementById('mexpl').value }).then(function (res) {
       btn.disabled = false; btn.textContent = 'Upload';
       if (!res.ok) { document.getElementById('mmsg').innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
-      toast('Uploaded. Thank you!'); route();
+      s.media = s.media || [];
+      if (res.item) s.media.unshift(res.item);
+      toast('Uploaded. Thank you!'); redraw(['mediabox']);
     });
   });
 }
@@ -765,30 +885,77 @@ function manageBox(s) {
       '<button class="btn sm" type="button" id="nwclear" style="margin-top:8px">Clear "not willing"</button>';
   } else {
     h += '<button class="btn sm danger" type="button" id="nwopen">Mark "School not willing to support"</button>' +
-      '<div id="nwform" hidden><label class="f" style="margin-top:8px">Reason<input type="text" id="nwwhy"></label><button class="btn sm primary" type="button" id="nwsave" style="margin-top:6px">Save</button></div>';
+      '<div id="nwform" hidden><label class="f" style="margin-top:8px">Reason<input type="text" id="nwwhy" data-keep="nw.why"></label><button class="btn sm primary" type="button" id="nwsave" style="margin-top:6px">Save</button></div>';
   }
   return h + '<div id="nwmsg"></div>';
 }
 function wireManage() {
   var s = APP.school, msg = document.getElementById('nwmsg');
+  if (!msg) return;
   var send = function (on, reason) {
     apiCall('setNotWilling', { schoolId: s.id, on: on, reason: reason }).then(function (res) {
       if (!res.ok) { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">' + esc(res.error) + '</div>'; return; }
-      toast('Saved.'); route();
+      s.notWilling = on; s.first.notWillingReason = on ? reason : '';
+      keepClear('nw');
+      toast('Saved.'); redraw(['managebox']);
     });
   };
   var c = document.getElementById('nwclear');
-  if (c) c.addEventListener('click', function () { send(false, ''); });
+  if (c) c.addEventListener('click', function () { c.disabled = true; send(false, ''); });
   var o = document.getElementById('nwopen');
   if (o) o.addEventListener('click', function () { document.getElementById('nwform').hidden = false; o.hidden = true; });
   var sv = document.getElementById('nwsave');
   if (sv) sv.addEventListener('click', function () {
     var why = document.getElementById('nwwhy').value.trim();
     if (!why) { msg.innerHTML = '<div class="msg bad" style="margin-top:6px">Write the reason.</div>'; return; }
-    send(true, why);
+    sv.disabled = true; send(true, why);
   });
 }
 /* ===== END P5.9 ===== */
+
+/* ===== START P5.10 Half-filled short forms kept on the phone ===== */
+// Boxes marked data-keep (call log, Update details, A4 note, location reason, "not willing" reason)
+// are kept on this phone while they are typed. If the phone goes to the home screen, the page is
+// closed or Back is pressed, they come back when the school is opened again (for 60 minutes).
+// They are removed when the form is saved or cancelled.
+var KEEP_MINUTES = 60;
+var KEEP_OPEN = {
+  call: function () { openCallForm(); },
+  upd: function () { openUpdate('', true); },
+  loc: function () { var r = document.getElementById('locreason'), c = document.getElementById('locchange'); if (r) r.hidden = false; if (c) c.hidden = true; },
+  nw: function () { var f = document.getElementById('nwform'), o = document.getElementById('nwopen'); if (f) f.hidden = false; if (o) o.hidden = true; }
+};
+function keepKey(k) { return 'hs_keep_' + (APP.me && APP.me.email || '') + '_' + (APP.school && APP.school.id) + '_' + k; }
+function keepStore(ev) {
+  var el = ev.target;
+  if (!el || !el.dataset || !el.dataset.keep || !APP.school) return;
+  try { localStorage.setItem(keepKey(el.dataset.keep), JSON.stringify({ v: el.type === 'checkbox' ? el.checked : el.value, t: Date.now() })); } catch (e) { }
+}
+function keepRestore() {
+  if (!APP.school || APP.school.readOnly) return;
+  var opened = {}, any = false;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-keep]'), function (el) {
+    var k = keepKey(el.dataset.keep), o = null;
+    try { o = JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { o = null; }
+    if (!o) return;
+    if (Date.now() - o.t > KEEP_MINUTES * 60000) { try { localStorage.removeItem(k); } catch (e) { } return; }
+    if (el.type === 'checkbox') el.checked = !!o.v; else el.value = o.v;
+    if (el.tagName === 'SELECT') el.dispatchEvent(new Event('change'));
+    var real = el.type === 'checkbox' ? !!o.v : (o.v !== '' && o.v !== el.defaultValue);
+    if (real) { opened[el.dataset.keep.split('.')[0]] = true; any = true; }
+  });
+  Object.keys(opened).forEach(function (g) { if (KEEP_OPEN[g]) KEEP_OPEN[g](); });
+  if (any) toast(WORDS.kept);
+}
+function keepClear(group) {
+  try {
+    var pre = keepKey(group + '.');
+    Object.keys(localStorage).forEach(function (k) { if (k.indexOf(pre) === 0) localStorage.removeItem(k); });
+  } catch (e) { }
+}
+document.addEventListener('input', keepStore, true);
+document.addEventListener('change', keepStore, true);
+/* ===== END P5.10 ===== */
 
 /* ===== START P6.1 The visit form ===== */
 // Same questions and headings as the A4 form. Only the date and "How did the visit go?" are needed.
@@ -806,6 +973,7 @@ function visitFormHtml(s) {
   var num = function (k) { return '<input type="number" min="0" inputmode="numeric" data-k="' + k + '">'; };
   var txt = function (k, ph) { return '<input type="text" data-k="' + k + '" placeholder="' + esc(ph || '') + '">'; };
   var ticks = function (k, list) { return '<div class="ticks">' + list.map(function (x) { return '<label><input type="checkbox" data-multi="' + k + '" value="' + esc(x) + '"> ' + esc(x) + '</label>'; }).join('') + '</div>'; };
+  var def = function (k) { return '<div class="def" id="def-' + k + '"></div>'; };   // the meaning of Healthy / Fair / Poor, under the choice
   var yn = ['Yes', 'No'];
   var h = '<div id="vform">';
   if (o) h += '<div class="msg warn">Office entry from the A4 form uploaded by ' + esc(o.volunteer) + ' (visit ' + esc(o.visitDate) + '). ' +
@@ -823,7 +991,7 @@ function visitFormHtml(s) {
     '<label class="wide" data-if="sWhyNot">If no, why not?' + txt('sWhyNot') + '</label></div>' +
     '<div class="nums"><label class="f">Planted' + num('sPlanted') + '</label><label class="f">Alive now' + num('sAlive') + '</label><label class="f">Dead' + num('sDead') + '</label></div>' +
     '<div id="vf-toomany"></div>' +
-    '<div class="form"><label>What is the health of the surviving saplings?' + sel('sHealth', L['Health']) + '</label></div>' +
+    '<div class="form"><label class="wide">What is the health of the surviving saplings?' + sel('sHealth', L['Health']) + def('sHealth') + '</label></div>' +
     '<label class="f">If some died, why?</label>' + ticks('sWhyDied', L['Why saplings died'] || []) +
     '<label class="f" data-if="sWhyDiedOther">Other reason' + txt('sWhyDiedOther') + '</label>' +
     '<div class="form"><label>Do they ask for replacement for dead plants?' + sel('sReplace', yn) + '</label>' +
@@ -833,14 +1001,13 @@ function visitFormHtml(s) {
     '<label>Seeds sown into packets by the school?' + sel('dSown', yn) + '</label>' +
     '<label class="wide" data-if="dWhyNot">If no, why not?' + txt('dWhyNot') + '</label>' +
     '<label class="wide">Out of the seeds given, how many grew into saplings and were planted?' + num('dGrew') + '</label>' +
-    '<label>Health of the saplings grown from the seeds' + sel('dHealth', L['Health']) + '</label>' +
-    '<label>Where were these saplings planted?' + txt('dWhere') + '</label></div></div>';
+    '<label class="wide">Health of the saplings grown from the seeds' + sel('dHealth', L['Health']) + def('dHealth') + '</label>' +
+    '<label class="wide">Where were these saplings planted?' + txt('dWhere') + '</label></div></div>';
   h += '<div class="box" id="vf-water"><h4>Watering (all plants)</h4><div class="form">' +
     '<label>Who waters the plants?' + sel('wWho', L['Who waters the plants']) + '</label>' +
     '<label data-if="wWhoOther">Name or designation' + txt('wWhoOther') + '</label>' +
     '<label data-if="wOften">How often do they water the plants?' + sel('wOften', L['How often watered']) + '</label>' +
-    '<label data-if="wSource">Where does the water for the plants come from?' + txt('wSource') + '</label></div>' +
-    '<div class="defs">' + ['Healthy', 'Fair', 'Poor'].map(function (k) { return '<div><b>' + k + ':</b> ' + esc(WORDS.health[k]) + '</div>'; }).join('') + '</div></div>';
+    '<label data-if="wSource">Where does the water for the plants come from?' + txt('wSource') + '</label></div></div>';
   // B
   h += '<div class="section-h">' + WORDS.partB + '</div>' +
     '<div class="act-row act-head"><span>Games or Awareness</span><span>Game or topic</span><span>Minutes</span><span>Boys</span><span>Girls</span><span>Number of teachers who joined</span><span>Grades</span></div>' +
@@ -910,10 +1077,10 @@ function openVisitForm(edit) {
   form.addEventListener('change', visitChanged);
   document.getElementById('vf-actadd').addEventListener('click', function () { actRow({}); });
   document.getElementById('vf-olddata').addEventListener('click', function () { openUpdate(''); });
-  document.getElementById('vf-close').addEventListener('click', function () { APP.office = null; route(); });
+  document.getElementById('vf-close').addEventListener('click', function () { APP.office = null; APP.editVisit = null; redraw(['visitbox'], true); });
   document.getElementById('vf-discard').addEventListener('click', function () {
     try { localStorage.removeItem(draftKey(s.id)); } catch (e) { }
-    toast('Draft discarded.'); route();
+    toast('Draft discarded.'); APP.office = null; redraw(['visitbox'], true);
   });
   document.getElementById('vf-photos').addEventListener('change', function () {
     var picked = Array.prototype.slice.call(this.files || []).slice(0, 5);
@@ -950,7 +1117,7 @@ function fillVisitForm(v) {
   var acts = (v.acts && v.acts.length) ? v.acts : [{ type: 'Games' }, { type: 'Awareness' }];
   acts.forEach(actRow);
 }
-// shows or hides questions, and the red warning when more were planted than given
+// shows or hides questions, the meaning of the chosen health, and the red warning when more were planted than given
 function visitShow() {
   var v = readVisitForm(), show = function (sel, on) { Array.prototype.forEach.call(document.querySelectorAll(sel), function (el) { el.hidden = !on; }); };
   show('#vf-sap', v.saplingsTicked); show('#vf-seed', v.seedsTicked); show('#vf-water', v.saplingsTicked || v.seedsTicked);
@@ -960,6 +1127,10 @@ function visitShow() {
   show('[data-if=dWhyNot]', v.dSown === 'No');
   show('[data-if=wWhoOther]', v.wWho === 'Other');
   show('[data-if=wOften]', v.wWho !== 'Nobody'); show('[data-if=wSource]', v.wWho !== 'Nobody');
+  ['sHealth', 'dHealth'].forEach(function (k) {
+    var el = document.getElementById('def-' + k);
+    if (el) el.innerHTML = v[k] && WORDS.health[v[k]] ? '<b>' + esc(v[k]) + ':</b> ' + esc(WORDS.health[v[k]]) : '';
+  });
   var too = v.sPlanted !== '' && v.sGiven !== '' && Number(v.sPlanted) > Number(v.sGiven);
   document.getElementById('vf-sap').classList.toggle('bad', too);
   document.getElementById('vf-toomany').innerHTML = too ? '<div class="msg bad" style="margin-top:8px">' + WORDS.plantedTooMany +
@@ -972,6 +1143,7 @@ function visitChanged() {
   if (APP.editVisit) return;                                 // edits are not kept as drafts
   clearTimeout(APP.draftTimer);
   APP.draftTimer = setTimeout(function () {
+    if (!document.getElementById('vform')) return;
     try { localStorage.setItem(draftKey(APP.school.id), JSON.stringify(readVisitForm())); } catch (e) { }
     var d = document.getElementById('vf-discard'); if (d) d.hidden = false;
   }, 400);
@@ -986,11 +1158,17 @@ function saveVisitForm() {
                          a4Id: o ? o.a4Id : '', volunteer: o ? o.volunteer : '' }).then(function (res) {
     btn.disabled = false; btn.textContent = 'Save visit';
     if (!res.ok) { msg.innerHTML = '<div class="msg bad" style="margin-top:10px">' + esc(res.error) + '</div>'; return; }
+    clearTimeout(APP.draftTimer);
     if (!APP.editVisit) { try { localStorage.removeItem(draftKey(s.id)); } catch (e) { } }
     toast(o ? 'Visit entered and the A4 form marked as entered.' : 'Visit saved. Thank you!');
+    s.visitsList = res.visits || s.visitsList;
+    (s.visitsList || []).forEach(function (x) { if (x.day && (!s.lastVisit || x.day > s.lastVisit)) s.lastVisit = x.day; });
+    if (res.notWilling) s.notWilling = true;
+    if (o) (s.a4 || []).forEach(function (u) { if (u.id === o.a4Id) u.entered = true; });
     var back = o && o.fromList;
     APP.office = null; APP.editVisit = null;
-    if (back) location.hash = 'admin/a4'; else route();
+    redraw(['visitbox', 'formbox']);
+    if (back) location.hash = 'admin/a4';
   });
 }
 /* ===== END P6.2 ===== */
@@ -1020,9 +1198,12 @@ function wireHistory() {
   Array.prototype.forEach.call(document.querySelectorAll('[data-vdel]'), function (b) {
     b.addEventListener('click', function () {
       if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Tap again to delete'; return; }
+      b.disabled = true;
       apiCall('deleteVisit', { visitId: b.dataset.vdel }).then(function (res) {
-        if (!res.ok) { toast(res.error); return; }
-        toast('Visit deleted.'); route();
+        if (!res.ok) { b.disabled = false; toast(res.error); return; }
+        s.visitsList = (s.visitsList || []).filter(function (x) { return x.id !== b.dataset.vdel; });
+        s.lastVisit = ''; s.visitsList.forEach(function (x) { if (x.day > s.lastVisit) s.lastVisit = x.day; });
+        toast('Visit deleted.'); redraw(['visitbox']);
       });
     });
   });
@@ -1032,6 +1213,7 @@ function wireHistory() {
 /* ===== START P7.1 Volunteers list (with remarks and changes) ===== */
 // Admin sees everybody; a coordinator sees only their own volunteers.
 // Tap a person: their schools, private remarks (never shown to volunteers) and, for the admin, changes.
+// Saving a remark or a change updates the list at once (no loading).
 function screenVolunteers() {
   var isAdmin = APP.me.role === 'Admin';
   var title = isAdmin ? 'All people in the Vol tab' : 'Your volunteers';
@@ -1042,7 +1224,7 @@ function screenVolunteers() {
     var wrap = document.getElementById('vwrap');
     if (!wrap) return;
     if (!res.ok) { wrap.innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
-    APP.vols = res.volunteers || [];
+    APP.vols = res.volunteers || []; APP.volsT = Date.now();
     APP.picked = {};
     var h = '<h2>' + title + '</h2>';
     h += '<div class="filters"><input type="search" id="vq" placeholder="Search name, email, centre or area" style="min-width:240px">' +
@@ -1064,7 +1246,13 @@ function screenVolunteers() {
       var bulk = function (coord) {
         var emails = Object.keys(APP.picked).filter(function (k) { return APP.picked[k]; });
         if (!emails.length) { toast('Tick at least one person first.'); return; }
-        apiCall('savePeople', { emails: emails, set: { coordinator: coord } }).then(function (r) { toast(r.ok ? r.changed + ' changed.' : r.error); if (r.ok) route(); });
+        apiCall('savePeople', { emails: emails, set: { coordinator: coord } }).then(function (r) {
+          if (!r.ok) { toast(r.error); return; }
+          var c = APP.vols.filter(function (x) { return x.email === coord; })[0];
+          APP.vols.forEach(function (v) { if (emails.indexOf(v.email) >= 0) { v.coordinator = coord; v.coordinatorName = coord ? (c ? c.name : coord) : ''; } });
+          APP.picked = {};
+          toast(r.changed + ' changed.'); drawVolunteers();
+        });
       };
       document.getElementById('vbgive').addEventListener('click', function () {
         var c = document.getElementById('vbcoord').value;
@@ -1164,9 +1352,14 @@ function wirePersonPanel() {
   if (rs) rs.addEventListener('click', function () {
     var text = document.getElementById('rt').value.trim();
     if (!text) { document.getElementById('pmsg').innerHTML = '<div class="msg bad">Write the remark.</div>'; return; }
-    apiCall('addRemark', { volunteer: rs.dataset.for, kind: document.getElementById('rk').value, aboutDate: document.getElementById('rd').value, remark: text }).then(function (r) {
+    var kind = document.getElementById('rk').value || 'Other', about = document.getElementById('rd').value;
+    rs.disabled = true; rs.textContent = 'Saving…';
+    apiCall('addRemark', { volunteer: rs.dataset.for, kind: kind, aboutDate: about, remark: text }).then(function (r) {
+      rs.disabled = false; rs.textContent = 'Save remark';
       if (!r.ok) { document.getElementById('pmsg').innerHTML = '<div class="msg bad">' + esc(r.error) + '</div>'; return; }
-      toast('Remark saved.'); route();
+      var v = APP.vols.filter(function (x) { return x.email === rs.dataset.for; })[0];
+      if (v) v.remarks.unshift({ kind: kind, remark: text, about: about ? niceDate(about) : '', by: APP.me.email, on: niceDate(todayIST()), recent: true });
+      toast('Remark saved.'); drawVolunteers();
     });
   });
   var ps = document.getElementById('psave');
@@ -1178,10 +1371,15 @@ function wirePersonPanel() {
     if (document.getElementById('ps').value !== v.status) set.status = document.getElementById('ps').value;
     if (document.getElementById('pc').value !== (v.coordinator || '')) set.coordinator = document.getElementById('pc').value;
     if (!Object.keys(set).length) { toast('Nothing changed.'); return; }
+    ps.disabled = true; ps.textContent = 'Saving…';
     apiCall('savePeople', { emails: [v.email], set: set }).then(function (r) {
+      ps.disabled = false; ps.textContent = 'Save changes';
       if (!r.ok) { document.getElementById('pmsg').innerHTML = '<div class="msg bad">' + esc(r.error) + '</div>'; return; }
-      if (set.loginEmail) APP.openVol = set.loginEmail;
-      toast('Saved.'); route();
+      if (set.loginEmail) { v.email = set.loginEmail; APP.openVol = set.loginEmail; v.note = ''; }
+      if (set.role) v.role = set.role;
+      if (set.status) v.status = set.status;
+      if ('coordinator' in set) { var c = APP.vols.filter(function (x) { return x.email === set.coordinator; })[0]; v.coordinator = set.coordinator; v.coordinatorName = set.coordinator ? (c ? c.name : set.coordinator) : ''; }
+      toast('Saved.'); drawVolunteers();
     });
   });
 }
@@ -1247,9 +1445,13 @@ function loadDashboard() {
       b.addEventListener('click', function () {
         b.disabled = true;
         apiCall('setSwitch', { key: b.dataset.switch, value: b.dataset.to }).then(function (r) {
-          if (!r.ok) { toast(r.error); b.disabled = false; return; }
-          APP.settings[{ VISIT_FORM_VOLUNTEERS: 'visitFormVolunteers', VISIT_FORM_COORDINATORS: 'visitFormCoordinators', MAP_VOLUNTEERS: 'mapVolunteers', MAP_COORDINATORS: 'mapCoordinators' }[b.dataset.switch]] = b.dataset.to;
-          toast('Switched ' + b.dataset.to + '.'); loadDashboard();
+          b.disabled = false;
+          if (!r.ok) { toast(r.error); return; }
+          var to = b.dataset.to;
+          APP.settings[{ VISIT_FORM_VOLUNTEERS: 'visitFormVolunteers', VISIT_FORM_COORDINATORS: 'visitFormCoordinators', MAP_VOLUNTEERS: 'mapVolunteers', MAP_COORDINATORS: 'mapCoordinators' }[b.dataset.switch]] = to;
+          b.textContent = to; b.dataset.to = to === 'On' ? 'Off' : 'On'; b.classList.toggle('primary', to === 'On');
+          APP.pages = {};                                     // school pages show the visit form by this switch
+          toast('Switched ' + to + '.');
         });
       });
     });
@@ -1260,38 +1462,65 @@ function loadDashboard() {
 /* ===== START P7.3 Assignments (by group or one by one) ===== */
 // Admin: any school to anyone. Coordinator: free schools to their own volunteers (or themselves).
 // The number a person wished for is only a guide: going above it shows a note, never a block.
+// "Preferred area": the chosen person's Taluk / Hobli / GP from the sign-up form, matched loosely
+// to the names in School Data (spellings differ). Giving or taking back updates the list at once.
 var FIND = { taluk: '', hobli: '', gp: '', q: '', show: '' };
 var GRP = { taluk: '', show: 'free', q: '', limit: 25 };
 function screenAssign() {
   var isAdmin = APP.me.role === 'Admin';
   if (!isAdmin && !FIND.show) FIND.show = 'free';
   APP.assignMode = APP.assignMode || 'groups';
-  setMain(subTabs() + '<h2>Assignments</h2><div id="apick"><p class="small">Loading people…</p></div>' +
+  setMain(subTabs() + '<h2>Assignments</h2><div class="bar" id="apick"><span class="small">Loading people…</span></div><div id="anote"></div><div id="apref"></div>' +
     '<div class="subtabs" style="margin-top:8px"><button type="button" data-mode="groups" aria-selected="' + (APP.assignMode === 'groups') + '">By group (Vol 1, Vol 2 …)</button>' +
     '<button type="button" data-mode="one" aria-selected="' + (APP.assignMode === 'one') + '">One by one</button></div>' +
     '<div class="filters" id="ff"></div><div id="flist"><p class="small">Loading…</p></div>');
   wireSubTabs();
   Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'), function (b) {
-    b.addEventListener('click', function () { APP.assignMode = b.dataset.mode; route(); });
-  });
-  apiCall('volunteers').then(function (res) {
-    APP.vols = res.ok ? res.volunteers : [];
-    var people = APP.vols.filter(function (v) { return /^active$/i.test(v.status); });
-    if (!isAdmin && !people.some(function (v) { return v.email === APP.me.email; })) people.unshift({ email: APP.me.email, name: APP.me.name + ' (me)', schools: (APP.myCount || 0), wants: '' });
-    APP.people = people;
-    document.getElementById('apick').innerHTML = '<div class="bar"><label class="f" style="flex:1;min-width:220px">Give schools to<select id="ato"><option value="">Choose the person…</option>' +
-      people.map(function (v) { return '<option value="' + esc(v.email) + '"' + (APP.giveTo === v.email ? ' selected' : '') + '>' + esc(v.name) + ' · has ' + v.schools + (v.wants ? ', wants ' + esc(v.wants) : '') + '</option>'; }).join('') +
-      '</select></label><input type="search" id="aq" placeholder="Find a person" style="max-width:200px"></div><div id="anote"></div>';
-    var sel = document.getElementById('ato');
-    sel.addEventListener('change', function () { APP.giveTo = sel.value; personNote(0); });
-    document.getElementById('aq').addEventListener('input', function () {
-      var q = this.value.toLowerCase();
-      Array.prototype.forEach.call(sel.options, function (o, i) { if (i) o.hidden = q && o.textContent.toLowerCase().indexOf(q) < 0; });
+    b.addEventListener('click', function () {
+      APP.assignMode = b.dataset.mode;
+      Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'), function (x) { x.setAttribute('aria-selected', String(x === b)); });
+      document.getElementById('flist').innerHTML = '<p class="small">Loading…</p>';
+      runAssign();
     });
-    personNote(0);
   });
-  if (APP.assignMode === 'groups') runGroups(); else runFind();
+  var ready = APP.vols && APP.vols.length && Date.now() - (APP.volsT || 0) < 3 * 60000 ? Promise.resolve({ ok: true, volunteers: APP.vols }) : apiCall('volunteers');
+  ready.then(function (res) {
+    if (!document.getElementById('apick')) return;
+    if (res.ok && res.volunteers !== APP.vols) { APP.vols = res.volunteers; APP.volsT = Date.now(); }
+    var people = (APP.vols || []).filter(function (v) { return /^active$/i.test(v.status); });
+    if (!isAdmin && !people.some(function (v) { return v.email === APP.me.email; })) people.unshift({ email: APP.me.email, name: APP.me.name + ' (me)', schools: (APP.mySchools ? APP.mySchools.length : 0), wants: '' });
+    APP.people = people;
+    personCombo('apick', people, APP.giveTo, function (email) { APP.giveTo = email; personNote(0); prefBar(); if (APP.usePref) runAssign(); }, 'Give schools to');
+    personNote(0); prefBar();
+    if (APP.usePref && prefOf()) runAssign();
+  });
+  runAssign();
 }
+function runAssign() { if (APP.assignMode === 'groups') runGroups(); else runFind(); }
+// the chosen person's preferred area (null when they gave none)
+function prefOf() {
+  var p = (APP.people || []).filter(function (v) { return v.email === APP.giveTo; })[0];
+  if (!p) return null;
+  var real = function (x) { return x && !/^any\b/i.test(String(x).trim()) ? String(x).trim() : ''; };
+  if (!real(p.pTaluk) && !real(p.pHobli) && !real(p.pGp)) return null;
+  return { taluk: p.pTaluk || '', hobli: p.pHobli || '', gp: p.pGp || '' };
+}
+function prefBar() {
+  var box = document.getElementById('apref'); if (!box) return;
+  var p = (APP.people || []).filter(function (v) { return v.email === APP.giveTo; })[0], pref = prefOf();
+  if (!p) { box.innerHTML = ''; return; }
+  if (!pref) { box.innerHTML = '<p class="small">' + esc(p.name) + ' gave no preferred area in the sign-up form.</p>'; APP.usePref = false; return; }
+  box.innerHTML = '<label class="check" style="margin:4px 0 6px"><input type="checkbox" id="aprefon"' + (APP.usePref ? ' checked' : '') + '> <span>Show only <b>' + esc(p.name) + '</b>\'s preferred area: ' +
+    esc([pref.taluk, pref.hobli, pref.gp].filter(String).join(' · ')) + '</span></label><div class="small" id="aprefmatch"></div>';
+  document.getElementById('aprefon').addEventListener('change', function () { APP.usePref = this.checked; document.getElementById('flist').innerHTML = '<p class="small">Loading…</p>'; runAssign(); });
+}
+function prefText(m) {
+  if (!m) return '';
+  var got = [].concat(m.taluk, m.hobli, m.gp).filter(String);
+  return (got.length ? 'Matched in the school list: ' + got.join(' · ') + '.' : 'Nothing in the preferred area matched the school list.') +
+    (m.missed && m.missed.length ? ' Not found: ' + m.missed.join(', ') + ' (spelling?).' : '');
+}
+function withPref(f) { var p = APP.usePref ? prefOf() : null; return p ? Object.assign({}, f, { pref: p }) : f; }
 // the soft note: "will have N schools (wished M)"
 function personNote(adding) {
   var box = document.getElementById('anote'); if (!box) return;
@@ -1301,14 +1530,27 @@ function personNote(adding) {
   box.innerHTML = '<p class="small">' + esc(p.name) + ' has ' + p.schools + ' school' + (p.schools === 1 ? '' : 's') + (p.wants ? ' and wished for ' + esc(p.wants) : '') + '.' +
     (adding && after > wants ? ' <span class="chip warn">After this: ' + after + ' schools, more than ' + wants + '. This is allowed.</span>' : '') + '</p>';
 }
+// marks the given or taken-back schools in the list on the screen, without loading again
+function patchAssigned(ids, to) {
+  var set = {}; ids.forEach(function (i) { set[String(i)] = true; });
+  var fix = function (s) { if (set[String(s.id)]) { s.assignedTo = to; s.mine = !!to; } };
+  if (APP.grpRes) APP.grpRes.groups.forEach(function (g) {
+    g.schools.forEach(fix);
+    g.given = g.schools.filter(function (s) { return s.assignedTo; }).length;
+    g.state = g.given === 0 ? 'free' : g.given === g.schools.length ? 'given' : 'partly';
+  });
+  if (APP.findRes) APP.findRes.schools.forEach(fix);
+}
 function giveSchools(ids, done) {
-  if (!APP.giveTo) { toast('First choose the person at the top.'); return; }
+  if (!APP.giveTo) { toast('First choose the person at the top.'); var i = document.querySelector('#apick .combo-in'); if (i) i.focus(); return; }
   personNote(ids.length);
   apiCall('assign', { to: APP.giveTo, schoolIds: ids }).then(function (r) {
     if (!r.ok) { toast(r.error); return; }
     toast(r.given + ' school' + (r.given === 1 ? '' : 's') + ' given.' + (r.skipped.length ? ' Not given: ' + r.skipped.join('; ') : ''));
     (APP.people || []).forEach(function (v) { if (v.email === APP.giveTo) v.schools += r.given; });
-    personNote(0);
+    patchAssigned(r.ids || [], APP.giveTo);
+    if (APP.giveTo === APP.me.email) APP.mySchools = null;
+    personNote(0); warmSoon();
     done();
   });
 }
@@ -1316,48 +1558,61 @@ function takeBackSchools(ids, done) {
   apiCall('takeBack', { schoolIds: ids }).then(function (r) {
     if (!r.ok) { toast(r.error); return; }
     toast(r.taken + ' school' + (r.taken === 1 ? '' : 's') + ' taken back.' + (r.skipped.length ? ' Skipped: ' + r.skipped.join('; ') : ''));
+    patchAssigned(r.ids || [], '');
+    APP.volsT = 0; APP.mySchools = null; warmSoon();
     done();
   });
 }
+var SEARCH_WAIT = 450;   // ms after the last key before searching
 function runGroups() {
-  apiCall('groups', { filters: GRP }).then(function (res) {
-    var ff = document.getElementById('ff'), fl = document.getElementById('flist');
-    if (!ff) return;
-    if (!res.ok) { fl.innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
+  apiCall('groups', { filters: withPref(GRP) }).then(function (res) {
+    if (!document.getElementById('ff') || APP.assignMode !== 'groups') return;
+    if (!res.ok) { document.getElementById('flist').innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
+    APP.grpRes = res; APP.findRes = null;
+    var ff = document.getElementById('ff');
     ff.innerHTML = '<select data-g="taluk"><option value="">All taluks</option>' + res.taluks.map(function (t) { return '<option' + (t === GRP.taluk ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' +
       '<select data-g="show">' + [['free', 'Free groups'], ['partly', 'Partly given'], ['given', 'Fully given'], ['all', 'All groups']].map(function (x) { return '<option value="' + x[0] + '"' + (GRP.show === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>' +
       '<input type="search" data-g="q" placeholder="Vol number, school or village" value="' + esc(GRP.q) + '" style="min-width:220px">';
-    Array.prototype.forEach.call(ff.querySelectorAll('[data-g]'), function (el) {
-      el.addEventListener('change', function () { GRP[el.dataset.g] = el.value; GRP.limit = 25; fl.innerHTML = '<p class="small">Loading…</p>'; runGroups(); });
+    Array.prototype.forEach.call(ff.querySelectorAll('select[data-g]'), function (el) {
+      el.addEventListener('change', function () { GRP[el.dataset.g] = el.value; GRP.limit = 25; document.getElementById('flist').innerHTML = '<p class="small">Loading…</p>'; runGroups(); });
     });
-    var h = '<p class="small">' + fmtN(res.total) + ' group' + (res.total === 1 ? '' : 's') + (res.total > res.groups.length ? ', first ' + res.groups.length + ' shown' : '') +
-      '. Groups are in the Sheet order: Vol 1 has the biggest planting. The taluk is the first school\'s.</p>';
-    res.groups.forEach(function (g) {
-      var free = g.schools.filter(function (s) { return !s.assignedTo; }).map(function (s) { return s.id; });
-      var back = g.schools.filter(function (s) { return s.assignedTo && (APP.me.role === 'Admin' || s.mine); }).map(function (s) { return s.id; });
-      h += '<div class="group ' + g.state + '"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>Vol ' + g.no + ' · ' + esc(g.taluk) + '</b>' +
-        '<span class="small">' + fmtN(g.saplings) + ' saplings' + (g.seeds ? ' + ' + fmtN(g.seeds) + ' seeds' : '') + ' · ' + { free: 'Free', partly: 'Partly given', given: 'Given' }[g.state] + '</span></div>';
-      g.schools.forEach(function (s, i) {
-        h += '<div class="list-row"><span class="sl">' + (i + 1) + '.</span><button class="link" type="button" data-open="' + s.id + '">' + esc(s.name) + '</button> ' +
-          '<span class="small">' + esc([s.village, s.gp, s.hobli, s.taluk].filter(String).join(' · ')) + ' · ' + esc(s.activity) + '</span> ' +
-          (s.assignedTo ? chip(s.assignedTo === 'Taken' ? 'Taken' : 'With ' + s.assignedTo, 'good') : chip('Free')) + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') + (s.caution ? chip('Not ready or merged', 'warn') : '') + '</div>';
-      });
-      h += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +
-        (free.length ? '<button class="btn sm primary" type="button" data-give="' + free.join(',') + '">Give ' + (free.length === g.schools.length ? 'this group' : 'the ' + free.length + ' free school' + (free.length === 1 ? '' : 's')) + '</button>' : '') +
-        (back.length ? '<button class="btn sm" type="button" data-back="' + back.join(',') + '">Take back ' + back.length + '</button>' : '') + '</div></div>';
-    });
-    if (res.total > res.groups.length) h += '<button class="btn" type="button" id="gmore">Show 25 more groups</button>';
-    fl.innerHTML = h;
-    var more = document.getElementById('gmore');
-    if (more) more.addEventListener('click', function () { GRP.limit = res.groups.length + 25; more.disabled = true; more.textContent = 'Loading…'; runGroups(); });
-    wireAssignButtons(runGroups);
+    var qi = ff.querySelector('input[data-g=q]');
+    qi.addEventListener('input', function () { clearTimeout(APP.searchT); APP.searchT = setTimeout(function () { GRP.q = qi.value; GRP.limit = 25; runGroups(); }, SEARCH_WAIT); });
+    drawGroups();
   });
 }
+function drawGroups() {
+  var res = APP.grpRes, fl = document.getElementById('flist');
+  if (!res || !fl) return;
+  var m = document.getElementById('aprefmatch'); if (m) m.textContent = prefText(res.pref);
+  var h = '<p class="small">' + fmtN(res.total) + ' group' + (res.total === 1 ? '' : 's') + (res.total > res.groups.length ? ', first ' + res.groups.length + ' shown' : '') +
+    '. Groups are in the Sheet order: Vol 1 has the biggest planting. The taluk is the first school\'s.</p>';
+  res.groups.forEach(function (g) {
+    var free = g.schools.filter(function (s) { return !s.assignedTo; }).map(function (s) { return s.id; });
+    var back = g.schools.filter(function (s) { return s.assignedTo && (APP.me.role === 'Admin' || s.mine); }).map(function (s) { return s.id; });
+    h += '<div class="group ' + g.state + '"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>Vol ' + g.no + ' · ' + esc(g.taluk) + '</b>' +
+      '<span class="small">' + fmtN(g.saplings) + ' saplings' + (g.seeds ? ' + ' + fmtN(g.seeds) + ' seeds' : '') + ' · ' + { free: 'Free', partly: 'Partly given', given: 'Given' }[g.state] + '</span></div>';
+    g.schools.forEach(function (s, i) {
+      h += '<div class="list-row"><span class="sl">' + (i + 1) + '.</span><button class="link" type="button" data-open="' + s.id + '">' + esc(s.name) + '</button> ' +
+        '<span class="small">' + esc([s.village, s.gp, s.hobli, s.taluk].filter(String).join(' · ')) + ' · ' + esc(s.activity) + '</span> ' +
+        (s.assignedTo ? chip(s.assignedTo === 'Taken' ? 'Taken' : 'With ' + s.assignedTo, 'good') : chip('Free')) + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') + (s.caution ? chip('Not ready or merged', 'warn') : '') + '</div>';
+    });
+    h += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +
+      (free.length ? '<button class="btn sm primary" type="button" data-give="' + free.join(',') + '">Give ' + (free.length === g.schools.length ? 'this group' : 'the ' + free.length + ' free school' + (free.length === 1 ? '' : 's')) + '</button>' : '') +
+      (back.length ? '<button class="btn sm" type="button" data-back="' + back.join(',') + '">Take back ' + back.length + '</button>' : '') + '</div></div>';
+  });
+  if (res.total > res.groups.length) h += '<button class="btn" type="button" id="gmore">Show 25 more groups</button>';
+  fl.innerHTML = h;
+  var more = document.getElementById('gmore');
+  if (more) more.addEventListener('click', function () { GRP.limit = res.groups.length + 25; more.disabled = true; more.textContent = 'Loading…'; runGroups(); });
+  wireAssignButtons(drawGroups);
+}
 function runFind() {
-  apiCall('findSchools', { filters: FIND }).then(function (res) {
-    var ff = document.getElementById('ff'), fl = document.getElementById('flist');
-    if (!ff) return;
-    if (!res.ok) { fl.innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
+  apiCall('findSchools', { filters: withPref(FIND) }).then(function (res) {
+    if (!document.getElementById('ff') || APP.assignMode !== 'one') return;
+    if (!res.ok) { document.getElementById('flist').innerHTML = '<div class="msg bad">' + esc(res.error) + '</div>'; return; }
+    APP.findRes = res; APP.grpRes = null;
+    var ff = document.getElementById('ff');
     var opt = function (list, cur, all) { return '<option value="">' + all + '</option>' + list.map(function (x) { return '<option' + (x === cur ? ' selected' : '') + '>' + esc(x) + '</option>'; }).join(''); };
     ff.innerHTML =
       '<select data-f="taluk">' + opt(res.taluks, FIND.taluk, 'All taluks') + '</select>' +
@@ -1366,38 +1621,46 @@ function runFind() {
       '<select data-f="show">' + [['', 'All schools'], ['free', 'Not given'], ['assigned', 'Given'], ['mine', APP.me.role === 'Admin' ? 'Given (any)' : 'My volunteers\''], ['notwilling', 'Not willing'], ['caution', 'Not ready or merged']]
         .map(function (x) { return '<option value="' + x[0] + '"' + (FIND.show === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>' +
       '<input type="search" data-f="q" placeholder="School, village, UDISE or Vol number" value="' + esc(FIND.q) + '" style="min-width:220px">';
-    Array.prototype.forEach.call(ff.querySelectorAll('[data-f]'), function (el) {
+    Array.prototype.forEach.call(ff.querySelectorAll('select[data-f]'), function (el) {
       el.addEventListener('change', function () {
         FIND[el.dataset.f] = el.value;
         if (el.dataset.f === 'taluk') { FIND.hobli = ''; FIND.gp = ''; }
         if (el.dataset.f === 'hobli') FIND.gp = '';
-        fl.innerHTML = '<p class="small">Loading…</p>';
+        document.getElementById('flist').innerHTML = '<p class="small">Loading…</p>';
         runFind();
       });
     });
-    var h = '<p class="small">' + fmtN(res.total) + ' school' + (res.total === 1 ? '' : 's') + (res.total > res.schools.length ? ', first ' + res.schools.length + ' shown' : '') + '. Tick schools, then Give or Take back. Press Enter after typing in the search box.</p>';
-    h += '<div class="bar"><span class="small" id="fcount">0 ticked</span><button class="btn sm primary" type="button" id="fgive">Give ticked</button><button class="btn sm" type="button" id="fback">Take back ticked</button></div>';
-    h += '<div class="tbl-wrap"><table><thead><tr><th><input type="checkbox" id="fall" aria-label="Tick all shown"></th><th class="n">Sl. No.</th><th>School</th><th>Place</th><th>Group</th><th>Given in Phase 1</th><th>With</th></tr></thead><tbody>';
-    res.schools.forEach(function (s) {
-      var given = [s.saplings ? fmtN(s.saplings) + ' saplings' : '', s.seeds ? fmtN(s.seeds) + ' seeds' : ''].filter(String).join(' + ');
-      h += '<tr><td><input type="checkbox" data-tick="' + s.id + '" aria-label="Tick"></td><td class="n">' + s.id + '</td><td><button class="link" type="button" data-open="' + s.id + '"><b>' + esc(s.name) + '</b></button><div class="small">' + esc(s.udise) + '</div>' +
-        (s.caution ? chip(/not ready/i.test(s.activity) ? 'Not ready' : 'Merged', 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') + '</td>' +
-        '<td>' + esc(s.taluk) + '<div class="small">' + esc([s.hobli, s.gp, s.village].join(' · ')) + '</div></td>' +
-        '<td>' + (s.group ? 'Vol ' + s.groupNo : '-') + '</td><td>' + esc(given || '-') + '</td><td>' + esc(s.assignedTo || '-') + '</td></tr>';
-    });
-    fl.innerHTML = h + '</tbody></table></div>';
-    var ticked = function () { return Array.prototype.filter.call(fl.querySelectorAll('[data-tick]'), function (c) { return c.checked; }).map(function (c) { return c.dataset.tick; }); };
-    fl.addEventListener('change', function () { document.getElementById('fcount').textContent = ticked().length + ' ticked'; });
-    document.getElementById('fall').addEventListener('change', function () { var on = this.checked; Array.prototype.forEach.call(fl.querySelectorAll('[data-tick]'), function (c) { c.checked = on; }); document.getElementById('fcount').textContent = ticked().length + ' ticked'; });
-    document.getElementById('fgive').addEventListener('click', function () { var ids = ticked(); if (!ids.length) { toast('Tick at least one school.'); return; } giveSchools(ids, runFind); });
-    document.getElementById('fback').addEventListener('click', function () { var ids = ticked(); if (!ids.length) { toast('Tick at least one school.'); return; } takeBackSchools(ids, runFind); });
-    wireAssignButtons(runFind);
+    var qi = ff.querySelector('input[data-f=q]');
+    qi.addEventListener('input', function () { clearTimeout(APP.searchT); APP.searchT = setTimeout(function () { FIND.q = qi.value; runFind(); }, SEARCH_WAIT); });
+    drawFind();
   });
+}
+function drawFind() {
+  var res = APP.findRes, fl = document.getElementById('flist');
+  if (!res || !fl) return;
+  var m = document.getElementById('aprefmatch'); if (m) m.textContent = prefText(res.pref);
+  var h = '<p class="small">' + fmtN(res.total) + ' school' + (res.total === 1 ? '' : 's') + (res.total > res.schools.length ? ', first ' + res.schools.length + ' shown' : '') + '. Tick schools, then Give or Take back.</p>';
+  h += '<div class="bar"><span class="small" id="fcount">0 ticked</span><button class="btn sm primary" type="button" id="fgive">Give ticked</button><button class="btn sm" type="button" id="fback">Take back ticked</button></div>';
+  h += '<div class="tbl-wrap"><table><thead><tr><th><input type="checkbox" id="fall" aria-label="Tick all shown"></th><th class="n">Sl. No.</th><th>School</th><th>Place</th><th>Group</th><th>Given in Phase 1</th><th>With</th></tr></thead><tbody>';
+  res.schools.forEach(function (s) {
+    var given = [s.saplings ? fmtN(s.saplings) + ' saplings' : '', s.seeds ? fmtN(s.seeds) + ' seeds' : ''].filter(String).join(' + ');
+    h += '<tr><td><input type="checkbox" data-tick="' + s.id + '" aria-label="Tick"></td><td class="n">' + s.id + '</td><td><button class="link" type="button" data-open="' + s.id + '"><b>' + esc(s.name) + '</b></button><div class="small">' + esc(s.udise) + '</div>' +
+      (s.caution ? chip(/not ready/i.test(s.activity) ? 'Not ready' : 'Merged', 'warn') : '') + (s.notWilling ? chip(WORDS.notWilling, 'bad') : '') + '</td>' +
+      '<td>' + esc(s.taluk) + '<div class="small">' + esc([s.hobli, s.gp, s.village].join(' · ')) + '</div></td>' +
+      '<td>' + (s.group ? 'Vol ' + s.groupNo : '-') + '</td><td>' + esc(given || '-') + '</td><td>' + esc(s.assignedTo || '-') + '</td></tr>';
+  });
+  fl.innerHTML = h + '</tbody></table></div>';
+  var ticked = function () { return Array.prototype.filter.call(fl.querySelectorAll('[data-tick]'), function (c) { return c.checked; }).map(function (c) { return c.dataset.tick; }); };
+  fl.addEventListener('change', function () { var c = document.getElementById('fcount'); if (c) c.textContent = ticked().length + ' ticked'; });
+  document.getElementById('fall').addEventListener('change', function () { var on = this.checked; Array.prototype.forEach.call(fl.querySelectorAll('[data-tick]'), function (c) { c.checked = on; }); document.getElementById('fcount').textContent = ticked().length + ' ticked'; });
+  document.getElementById('fgive').addEventListener('click', function () { var ids = ticked(); if (!ids.length) { toast('Tick at least one school.'); return; } giveSchools(ids, drawFind); });
+  document.getElementById('fback').addEventListener('click', function () { var ids = ticked(); if (!ids.length) { toast('Tick at least one school.'); return; } takeBackSchools(ids, drawFind); });
+  wireAssignButtons(drawFind);
 }
 function wireAssignButtons(again) {
   Array.prototype.forEach.call(document.querySelectorAll('#flist [data-open]'), function (b) { b.addEventListener('click', function () { openSchoolFrom(b.dataset.open); }); });
-  Array.prototype.forEach.call(document.querySelectorAll('#flist [data-give]'), function (b) { b.addEventListener('click', function () { giveSchools(b.dataset.give.split(','), again); }); });
-  Array.prototype.forEach.call(document.querySelectorAll('#flist [data-back]'), function (b) { b.addEventListener('click', function () { takeBackSchools(b.dataset.back.split(','), again); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('#flist [data-give]'), function (b) { b.addEventListener('click', function () { b.disabled = true; giveSchools(b.dataset.give.split(','), again); setTimeout(function () { b.disabled = false; }, 3000); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('#flist [data-back]'), function (b) { b.addEventListener('click', function () { b.disabled = true; takeBackSchools(b.dataset.back.split(','), again); setTimeout(function () { b.disabled = false; }, 3000); }); });
 }
 /* ===== END P7.3 ===== */
 
@@ -1406,6 +1669,7 @@ function screenA4List() {
   setMain(subTabs() + '<h2>Uploaded A4 forms</h2><p class="small">Loading…</p>');
   wireSubTabs();
   apiCall('a4List').then(function (res) {
+    if (APP.where.sub !== 'a4') return;
     if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); wireSubTabs(); return; }
     var list = res.uploads || [], show = APP.a4show || 'waiting';
     var shown = list.filter(function (u) { return show === 'all' || (show === 'waiting' ? !u.entered : u.entered); });
@@ -1439,13 +1703,14 @@ function wireA4Show() {
 
 /* ===== START P7.5 Alerts block ===== */
 // "Needs attention": Pit digging / tree guard and Concern ticked in a visit. Not willing: a separate list.
+// "Mark done" is written in the Visits tab (columns "Alert done by" and "Alert done on" of that visit).
 function alertsBlock(boxId) {
   apiCall('alerts').then(function (res) {
     var box = document.getElementById(boxId);
     if (!box || !res.ok) return;
     var h = '';
     if (res.alerts.length) {
-      h += '<h3>⚠ ' + WORDS.alertsTitle + ' (' + res.alerts.length + ')</h3>' + res.alerts.slice(0, 30).map(function (a) {
+      h += '<h3>⚠ ' + WORDS.alertsTitle + ' (<span id="acount">' + res.alerts.length + '</span>)</h3>' + res.alerts.slice(0, 30).map(function (a) {
         return '<div class="alert-row"><b>' + esc(a.kinds.join(' · ')) + '</b> · <button class="link" type="button" data-aopen="' + a.schoolId + '">' + esc(a.school) + '</button>' +
           '<div class="small">' + esc(a.place) + ' · visit ' + esc(a.date) + ' · ' + esc(a.volunteer) + '</div>' + (a.remarks ? '<div>' + esc(a.remarks) + '</div>' : '') +
           '<button class="btn sm" type="button" data-adone="' + esc(a.visitId) + '" style="margin-top:4px">Mark done</button></div>';
@@ -1462,7 +1727,12 @@ function alertsBlock(boxId) {
     Array.prototype.forEach.call(box.querySelectorAll('[data-adone]'), function (b) {
       b.addEventListener('click', function () {
         b.disabled = true;
-        apiCall('alertDone', { visitId: b.dataset.adone }).then(function (r) { if (!r.ok) { toast(r.error); b.disabled = false; return; } toast('Marked done.'); alertsBlock(boxId); });
+        apiCall('alertDone', { visitId: b.dataset.adone }).then(function (r) {
+          if (!r.ok) { toast(r.error); b.disabled = false; return; }
+          toast('Marked done.');
+          var row = b.closest('.alert-row'); if (row) row.remove();
+          var c = document.getElementById('acount'); if (c) c.textContent = String(Math.max(0, Number(c.textContent) - 1));
+        });
       });
     });
   });
@@ -1474,37 +1744,44 @@ function screenCoordinators() {
   setMain(subTabs() + '<h2>Coordinators</h2><p class="small">Loading…</p>');
   wireSubTabs();
   apiCall('volunteers').then(function (res) {
+    if (APP.where.sub !== 'coordinators') return;
     if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); wireSubTabs(); return; }
-    APP.vols = res.volunteers;
-    var coords = APP.vols.filter(function (v) { return /^coord/i.test(v.role); });
-    var others = APP.vols.filter(function (v) { return !/^coord/i.test(v.role) && /^active$/i.test(v.status); });
-    var noCoord = APP.vols.filter(function (v) { return /^vol/i.test(v.role) && !v.coordinator; }).length;
-    var h = subTabs() + '<h2>Coordinators</h2><p class="small">' + noCoord + ' volunteer' + (noCoord === 1 ? ' has' : 's have') + ' no coordinator yet: give them in Admin → Volunteers (tick, then "Give to coordinator").</p>';
-    h += '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Coordinator</th><th>Status</th><th class="n">Volunteers</th><th class="n">Their schools</th><th class="n">Visited</th><th></th></tr></thead><tbody>';
-    coords.forEach(function (c, i) {
-      var mine = APP.vols.filter(function (v) { return v.coordinator === c.email; });
-      h += '<tr><td>' + (i + 1) + '</td><td><b>' + esc(c.name) + '</b><div class="small">' + esc(c.email) + '</div></td><td>' + chip(c.status, /^active$/i.test(c.status) ? 'good' : 'bad') + '</td>' +
-        '<td class="n">' + mine.length + '</td><td class="n">' + mine.reduce(function (t, v) { return t + v.schools; }, 0) + '</td><td class="n">' + mine.reduce(function (t, v) { return t + v.visited; }, 0) + '</td>' +
-        '<td><button class="btn sm" type="button" data-unmake="' + esc(c.email) + '">Make volunteer again</button></td></tr>';
+    APP.vols = res.volunteers; APP.volsT = Date.now();
+    drawCoordinators();
+  });
+}
+function drawCoordinators() {
+  var coords = APP.vols.filter(function (v) { return /^coord/i.test(v.role); });
+  var others = APP.vols.filter(function (v) { return !/^coord/i.test(v.role) && /^active$/i.test(v.status); });
+  var noCoord = APP.vols.filter(function (v) { return /^vol/i.test(v.role) && !v.coordinator; }).length;
+  var h = subTabs() + '<h2>Coordinators</h2><p class="small">' + noCoord + ' volunteer' + (noCoord === 1 ? ' has' : 's have') + ' no coordinator yet: give them in Admin → Volunteers (tick, then "Give to coordinator").</p>';
+  h += '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Coordinator</th><th>Status</th><th class="n">Volunteers</th><th class="n">Their schools</th><th class="n">Visited</th><th></th></tr></thead><tbody>';
+  coords.forEach(function (c, i) {
+    var mine = APP.vols.filter(function (v) { return v.coordinator === c.email; });
+    h += '<tr><td>' + (i + 1) + '</td><td><b>' + esc(c.name) + '</b><div class="small">' + esc(c.email) + '</div></td><td>' + chip(c.status, /^active$/i.test(c.status) ? 'good' : 'bad') + '</td>' +
+      '<td class="n">' + mine.length + '</td><td class="n">' + mine.reduce(function (t, v) { return t + v.schools; }, 0) + '</td><td class="n">' + mine.reduce(function (t, v) { return t + v.visited; }, 0) + '</td>' +
+      '<td><button class="btn sm" type="button" data-unmake="' + esc(c.email) + '">Make volunteer again</button></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<h3 style="margin-top:18px">Make a person coordinator</h3><div class="bar"><div id="mpick" style="flex:1;min-width:240px"></div>' +
+    '<button class="btn sm primary" type="button" id="mgo" style="align-self:flex-end">Make coordinator</button></div>';
+  setMain(h); wireSubTabs();
+  APP.makeCoord = '';
+  personCombo('mpick', others, '', function (email) { APP.makeCoord = email; }, 'Person');
+  var setRole = function (email, role, btn) {
+    if (btn) btn.disabled = true;
+    apiCall('savePeople', { emails: [email], set: { role: role } }).then(function (r) {
+      if (btn) btn.disabled = false;
+      if (!r.ok) { toast(r.error); return; }
+      APP.vols.forEach(function (v) { if (v.email === email) v.role = role; });
+      toast('Saved.'); drawCoordinators();
     });
-    h += '</tbody></table></div>';
-    h += '<h3 style="margin-top:18px">Make a person coordinator</h3><div class="bar"><input type="search" id="mq" placeholder="Find a person" style="max-width:200px">' +
-      '<select id="mp"><option value="">Choose…</option>' + others.map(function (v) { return '<option value="' + esc(v.email) + '">' + esc(v.name) + ' · ' + esc(v.email) + '</option>'; }).join('') + '</select>' +
-      '<button class="btn sm primary" type="button" id="mgo">Make coordinator</button></div>';
-    setMain(h); wireSubTabs();
-    document.getElementById('mq').addEventListener('input', function () {
-      var q = this.value.toLowerCase();
-      Array.prototype.forEach.call(document.getElementById('mp').options, function (o, i) { if (i) o.hidden = q && o.textContent.toLowerCase().indexOf(q) < 0; });
-    });
-    var setRole = function (email, role) {
-      apiCall('savePeople', { emails: [email], set: { role: role } }).then(function (r) { toast(r.ok ? 'Saved.' : r.error); if (r.ok) route(); });
-    };
-    document.getElementById('mgo').addEventListener('click', function () { var e = document.getElementById('mp').value; if (!e) { toast('Choose the person.'); return; } setRole(e, 'Coordinator'); });
-    Array.prototype.forEach.call(document.querySelectorAll('[data-unmake]'), function (b) {
-      b.addEventListener('click', function () {
-        if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Tap again to confirm'; return; }
-        setRole(b.dataset.unmake, 'Volunteer');
-      });
+  };
+  document.getElementById('mgo').addEventListener('click', function () { if (!APP.makeCoord) { toast('Choose the person.'); return; } setRole(APP.makeCoord, 'Coordinator', this); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-unmake]'), function (b) {
+    b.addEventListener('click', function () {
+      if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Tap again to confirm'; return; }
+      setRole(b.dataset.unmake, 'Volunteer', b);
     });
   });
 }
@@ -1512,41 +1789,95 @@ function screenCoordinators() {
 
 /* ===== START P7.7 Corrections (approve or reject) ===== */
 // Admin: all schools. Coordinator: the schools of their volunteers.
+// Approving writes Status = Approved in the Corrections tab; the app then shows the new value everywhere.
+// School Data keeps the original Phase 1 value: nothing has to be copied by hand.
 function screenCorrections() {
   setMain(subTabs() + '<h2>Corrections</h2><p class="small">Loading…</p>');
   wireSubTabs();
   apiCall('corrections').then(function (res) {
+    if (APP.where.sub !== 'corrections') return;
     if (!res.ok) { setMain(subTabs() + '<div class="msg bad">' + esc(res.error) + '</div>'); wireSubTabs(); return; }
-    var h = subTabs() + '<h2>Corrections</h2><p class="small">Proposed with "Update details". Approving shows the new value in the app; your own tabs in the Sheet are not changed.</p>';
-    if (!res.pending.length) h += '<div class="card">Nothing is waiting.</div>';
-    res.pending.forEach(function (c) {
-      h += '<div class="card" style="margin-bottom:10px"><b>' + esc(c.field) + '</b> · <button class="link" type="button" data-open="' + c.schoolId + '">' + esc(c.school) + '</button>' +
-        '<div style="margin-top:6px">New: <b>' + esc(c.value) + '</b></div>' + (c.species ? '<div class="small">Species: ' + esc(c.species) + '</div>' : '') +
-        '<div class="old">' + (c.field.indexOf('Other') === 0 ? 'About: ' : 'Old: ') + esc(c.old || '-') + '</div>' +
-        '<div class="small">Proposed by ' + esc(c.by) + ', ' + esc(c.on) + '</div>' +
-        '<div style="margin-top:8px;display:flex;gap:8px"><button class="btn sm primary" type="button" data-dec="Approve" data-id="' + esc(c.id) + '">Approve</button>' +
-        '<button class="btn sm danger" type="button" data-dec="Reject" data-id="' + esc(c.id) + '">Reject</button></div></div>';
-    });
-    if (res.done.length) {
-      h += '<h3 style="margin-top:18px">Recently decided</h3><div class="tbl-wrap"><table><thead><tr><th>School</th><th>What</th><th>New value</th><th>Decision</th></tr></thead><tbody>' +
-        res.done.map(function (c) { return '<tr><td>' + esc(c.school) + '</td><td>' + esc(c.field) + '</td><td>' + esc(c.value) + '</td><td>' + chip(c.status, /approved/i.test(c.status) ? 'good' : 'bad') + '<div class="small">' + esc(c.decidedBy) + ', ' + esc(c.decidedOn) + '</div></td></tr>'; }).join('') +
-        '</tbody></table></div>';
-    }
-    setMain(h); wireSubTabs();
-    Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) { b.addEventListener('click', function () { openSchoolFrom(b.dataset.open); }); });
-    Array.prototype.forEach.call(document.querySelectorAll('[data-dec]'), function (b) {
-      b.addEventListener('click', function () {
-        b.disabled = true;
-        apiCall('decide', { id: b.dataset.id, decision: b.dataset.dec }).then(function (r) { toast(r.ok ? (b.dataset.dec === 'Approve' ? 'Approved.' : 'Rejected.') : r.error); route(); });
+    APP.corr = res;
+    drawCorrections();
+  });
+}
+function drawCorrections() {
+  var res = APP.corr;
+  var h = subTabs() + '<h2>Corrections</h2><p class="small">Proposed with "Update details". Approving shows the new value in the app at once (it is recorded in the Corrections tab). School Data keeps the original value; nothing needs to be copied by hand.</p>';
+  if (!res.pending.length) h += '<div class="card">Nothing is waiting.</div>';
+  res.pending.forEach(function (c) {
+    h += '<div class="card" style="margin-bottom:10px"><b>' + esc(c.field) + '</b> · <button class="link" type="button" data-open="' + c.schoolId + '">' + esc(c.school) + '</button>' +
+      '<div style="margin-top:6px">New: <b>' + esc(c.value) + '</b></div>' + (c.species ? '<div class="small">Species: ' + esc(c.species) + '</div>' : '') +
+      '<div class="old">' + (c.field.indexOf('Other') === 0 ? 'About: ' : 'Now: ') + esc(c.old || '-') + '</div>' +
+      '<div class="small">Proposed by ' + esc(c.by) + ', ' + esc(c.on) + '</div>' +
+      '<div style="margin-top:8px;display:flex;gap:8px"><button class="btn sm primary" type="button" data-dec="Approve" data-id="' + esc(c.id) + '">Approve</button>' +
+      '<button class="btn sm danger" type="button" data-dec="Reject" data-id="' + esc(c.id) + '">Reject</button></div></div>';
+  });
+  if (res.done.length) {
+    h += '<h3 style="margin-top:18px">Recently decided</h3><div class="tbl-wrap"><table><thead><tr><th>School</th><th>What</th><th>New value</th><th>Decision</th></tr></thead><tbody>' +
+      res.done.map(function (c) { return '<tr><td>' + esc(c.school) + '</td><td>' + esc(c.field) + '</td><td>' + esc(c.value) + '</td><td>' + chip(c.status, /approved/i.test(c.status) ? 'good' : 'bad') + '<div class="small">' + esc(c.decidedBy) + ', ' + esc(c.decidedOn) + '</div></td></tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
+  setMain(h); wireSubTabs();
+  Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) { b.addEventListener('click', function () { openSchoolFrom(b.dataset.open); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-dec]'), function (b) {
+    b.addEventListener('click', function () {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-id="' + b.dataset.id + '"]'), function (x) { x.disabled = true; });
+      apiCall('decide', { id: b.dataset.id, decision: b.dataset.dec }).then(function (r) {
+        if (!r.ok) { toast(r.error); drawCorrections(); return; }
+        var c = res.pending.filter(function (x) { return x.id === b.dataset.id; })[0];
+        res.pending = res.pending.filter(function (x) { return x !== c; });
+        if (c) { c.status = b.dataset.dec === 'Approve' ? 'Approved' : 'Rejected'; c.decidedBy = APP.me.email; c.decidedOn = r.decidedOn || ''; res.done.unshift(c); APP.pages = {}; }
+        toast(b.dataset.dec === 'Approve' ? 'Approved.' : 'Rejected.'); warmSoon(); drawCorrections();
       });
     });
   });
 }
 /* ===== END P7.7 ===== */
 
+/* ===== START P7.8 Person picker (search inside the list) ===== */
+// One box: type a name or email and the list below it narrows as you type; tap a person to choose.
+// people: [{email, name, schools, wants, area}]; onPick(email) is called with the chosen email.
+function personCombo(boxId, people, current, onPick, label) {
+  var box = document.getElementById(boxId);
+  if (!box) return;
+  var cur = people.filter(function (p) { return p.email === current; })[0] || null;
+  box.innerHTML = '<label class="f combo-wrap">' + esc(label || 'Person') + '<div class="combo"><input type="search" class="combo-in" autocomplete="off" placeholder="Type a name or email, or tap to see everyone" value="' + esc(cur ? cur.name : '') + '">' +
+    '<div class="combo-list" role="listbox" hidden></div></div></label>';
+  var input = box.querySelector('.combo-in'), list = box.querySelector('.combo-list');
+  var draw = function () {
+    var q = input.value.trim().toLowerCase();
+    if (cur && input.value === cur.name) q = '';
+    var hits = people.filter(function (p) { return !q || (p.name + ' ' + p.email + ' ' + (p.area || '') + ' ' + (p.centre || '')).toLowerCase().indexOf(q) >= 0; });
+    list.innerHTML = (hits.length ? hits.slice(0, 80).map(function (p) {
+      return '<button type="button" class="combo-item" data-email="' + esc(p.email) + '"><b>' + esc(p.name) + '</b> <span class="small">' + esc(p.email) +
+        (p.schools !== undefined ? ' · has ' + p.schools + (p.wants ? ', wants ' + esc(p.wants) : '') : '') + (p.area ? ' · ' + esc(p.area) : '') + '</span></button>';
+    }).join('') + (hits.length > 80 ? '<div class="small" style="padding:8px 10px">' + (hits.length - 80) + ' more: type more letters to narrow.</div>' : '')
+      : '<div class="small" style="padding:8px 10px">Nobody matches.</div>');
+    list.hidden = false;
+  };
+  var pick = function (email) {
+    cur = people.filter(function (p) { return p.email === email; })[0] || null;
+    input.value = cur ? cur.name : '';
+    list.hidden = true;
+    onPick(email);
+  };
+  input.addEventListener('focus', draw);
+  input.addEventListener('input', draw);
+  input.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { var f = list.querySelector('.combo-item'); if (f) { e.preventDefault(); pick(f.dataset.email); input.blur(); } }
+    if (e.key === 'Escape') list.hidden = true;
+  });
+  list.addEventListener('mousedown', function (e) { e.preventDefault(); });   // keeps the box open while tapping
+  list.addEventListener('click', function (e) { var b = e.target.closest('.combo-item'); if (b) { pick(b.dataset.email); input.blur(); } });
+  input.addEventListener('blur', function () { setTimeout(function () { list.hidden = true; if (cur && !input.value.trim()) input.value = cur.name; }, 150); });
+}
+/* ===== END P7.8 ===== */
+
 /* ===== START P8.1 Map ===== */
 // Solid dot = real position saved at the school. Hollow dot = approximate (village, or near the taluk centre).
-// Admin: all schools. Coordinator: their volunteers' schools (and own). Volunteer: own schools.
+// Admin: all schools. Coordinator: their volunteers' schools (and own). Volunteer: ONLY their own schools.
+// The search box searches as you type (school name, village, GP or UDISE); one match opens its popup.
 var MAPF = { taluk: '', show: '', q: '' };
 function screenMap() {
   setMain('<h2>Map</h2><div class="filters" id="mf"></div><div class="legend" id="mlegend"></div><div id="map"><p class="small" style="padding:12px">Loading the map…</p></div><p class="small" id="mcount"></p>');
@@ -1559,13 +1890,16 @@ function screenMap() {
       document.getElementById('mf').innerHTML = '<select data-m="taluk"><option value="">All taluks</option>' + taluks.map(function (t) { return '<option' + (MAPF.taluk === t ? ' selected' : '') + '>' + esc(t) + '</option>'; }).join('') + '</select>' +
         '<select data-m="show">' + [['', 'All schools'], ['given', 'Given to a volunteer'], ['free', 'Not given'], ['visited', 'Visited'], ['notwilling', 'Not willing'], ['caution', 'Not ready or merged'], ['gps', 'Real position saved']]
           .map(function (x) { return '<option value="' + x[0] + '"' + (MAPF.show === x[0] ? ' selected' : '') + '>' + x[1] + '</option>'; }).join('') + '</select>' +
-        '<input type="search" data-m="q" placeholder="School or village" value="' + esc(MAPF.q) + '">';
+        '<input type="search" data-m="q" id="mq" placeholder="Search school, village or UDISE" value="' + esc(MAPF.q) + '" style="min-width:220px">';
       document.getElementById('mlegend').innerHTML = [['--map-visited', 'Visited'], ['--map-given', 'Given, not visited yet'], ['--map-free', 'Not given'], ['--map-bad', 'Not willing'], ['--map-caution', 'Not ready or merged']]
         .map(function (x) { return '<span><span class="dot" style="background:var(' + x[0] + ')"></span>' + x[1] + '</span>'; }).join('') +
         '<span><span class="dot"  style="background:var(--muted)"></span>real position</span><span style="color:var(--muted)"><span class="dot hollow"></span>approximate</span>';
-      Array.prototype.forEach.call(document.querySelectorAll('[data-m]'), function (el) {
-        el.addEventListener('change', function () { MAPF[el.dataset.m] = el.value; drawMap(); });
+      Array.prototype.forEach.call(document.querySelectorAll('select[data-m]'), function (el) {
+        el.addEventListener('change', function () { MAPF[el.dataset.m] = el.value; drawMap(true); });
       });
+      var qi = document.getElementById('mq');
+      qi.addEventListener('input', function () { clearTimeout(APP.mapT); APP.mapT = setTimeout(function () { MAPF.q = qi.value.trim(); drawMap(true); }, 300); });
+      qi.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(APP.mapT); MAPF.q = qi.value.trim(); drawMap(true); } });
       document.getElementById('map').innerHTML = '';
       APP.map = L.map('map', { preferCanvas: true }).setView([13.55, 77.75], 9);
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap contributors' }).addTo(APP.map);
@@ -1583,6 +1917,7 @@ function loadLeaflet(done) {
   document.head.appendChild(js);
 }
 function drawMap(fit) {
+  if (!APP.map) return;
   var cs = getComputedStyle(document.documentElement), col = function (v) { return cs.getPropertyValue(v).trim(); };
   var q = MAPF.q.toLowerCase();
   var pts = APP.points.filter(function (p) {
@@ -1593,25 +1928,27 @@ function drawMap(fit) {
     if (MAPF.show === 'notwilling' && !p.w) return false;
     if (MAPF.show === 'caution' && !p.c) return false;
     if (MAPF.show === 'gps' && p.k !== 'gps') return false;
-    return !q || (p.n + ' ' + p.v + ' ' + p.g).toLowerCase().indexOf(q) >= 0;
+    return !q || (p.n + ' ' + p.v + ' ' + p.g + ' ' + (p.u || '')).toLowerCase().indexOf(q) >= 0;
   });
   APP.mapLayer.clearLayers();
   var rank = function (p) { return p.w ? 4 : p.lv ? 3 : p.a ? 2 : p.c ? 1 : 0; };
   pts.sort(function (a, b) { return rank(a) - rank(b); });      // free schools below, given and visited on top
-  var bounds = [];
+  var bounds = [], only = null;
   pts.forEach(function (p) {
     var c = p.w ? col('--map-bad') : p.c ? col('--map-caution') : p.lv ? col('--map-visited') : p.a ? col('--map-given') : col('--map-free');
     var real = p.k === 'gps';
     var m = L.circleMarker([p.la, p.lo], { radius: real ? 7 : 6, color: c, weight: real ? 1 : 2, fillColor: c, fillOpacity: real ? 0.9 : 0.05 });
-    m.bindPopup('<b>' + esc(p.n) + '</b><br>' + esc([p.v, p.g, p.h, p.t].filter(String).join(' · ')) + '<br>' +
+    m.bindPopup('<b>' + esc(p.n) + '</b><br>' + esc([p.v, p.g, p.h, p.t].filter(String).join(' · ')) + (p.u ? '<br>UDISE ' + esc(p.u) : '') + '<br>' +
       (p.a ? 'With ' + esc(p.a) : 'Not given') + (p.lv ? '<br>Last visit ' + esc(niceDate(p.lv)) : '') + (p.w ? '<br><b>' + WORDS.notWilling + '</b>' : '') +
       (p.gr ? '<br>Vol ' + p.gr : '') + '<br><span style="color:#888">' + (real ? 'Real position' : p.k === 'village' ? 'Approximate (village)' : 'Approximate (taluk)') + '</span><br>' +
       '<a href="https://www.google.com/maps?q=' + p.la + ',' + p.lo + '" target="_blank" rel="noopener">Open in Google Maps</a> · <a href="#" data-mapopen="' + p.id + '">Open school</a>');
     m.addTo(APP.mapLayer);
     bounds.push([p.la, p.lo]);
+    only = m;
   });
-  document.getElementById('mcount').textContent = pts.length + ' school' + (pts.length === 1 ? '' : 's') + ' on the map.';
-  if (bounds.length && (fit || MAPF.taluk || q)) APP.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+  document.getElementById('mcount').textContent = pts.length ? pts.length + ' school' + (pts.length === 1 ? '' : 's') + ' on the map.' : (q ? 'No school matches "' + MAPF.q + '".' : 'No school to show.');
+  if (bounds.length && fit) APP.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+  if (pts.length === 1 && q && only) only.openPopup();
 }
 document.addEventListener('click', function (ev) {
   var a = ev.target.closest && ev.target.closest('[data-mapopen]');
@@ -1690,8 +2027,9 @@ window.addEventListener('hashchange', route);
 /* ===== END P10.2 ===== */
 
 /* ===== START P10.3 Small helpers ===== */
-var APP = { token: '', clientId: '', me: null, settings: {}, vols: [], school: null, a4files: [], preSchools: null, openVol: '', backHash: '', where: { top: '', sub: '' },
-            picked: {}, office: null, editVisit: null, visitPhotos: [], giveTo: '', people: [], points: [], map: null };
+var APP = { token: '', clientId: '', me: null, settings: {}, vols: [], volsT: 0, school: null, a4files: [], preSchools: null, mySchools: null, pages: {}, openVol: '', backHash: '',
+            where: { top: '', sub: '' }, picked: {}, office: null, editVisit: null, visitPhotos: [], giveTo: '', usePref: false, people: [], points: [], map: null,
+            grpRes: null, findRes: null, corr: null };
 function esc(v) { return String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function fmtN(n) { return (n === null || n === undefined || n === '') ? '-' : Number(n).toLocaleString('en-IN'); }
 function chip(t, kind) { return '<span class="chip' + (kind ? ' ' + kind : '') + '">' + esc(t) + '</span>'; }
