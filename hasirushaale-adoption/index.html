@@ -1400,12 +1400,7 @@ function countPicked() {
 function personPanel(v) {
   var isAdmin = APP.me.role === 'Admin';
   var h = '<div class="small" style="margin-bottom:4px">' + esc([v.area ? 'Preferred area: ' + v.area : '', v.coordinatorName ? 'Coordinator: ' + v.coordinatorName : ''].filter(String).join(' · ')) + '</div>';
-  h += '<h4>Schools</h4>' + (v.schoolList && v.schoolList.length ? v.schoolList.map(function (s, k) {
-    return '<div class="list-row"><button class="link" type="button" data-school="' + s.id + '">' + (k + 1) + '. ' + esc(s.name) + '</button>' +
-      ' <span class="small">' + esc([s.village, s.taluk].filter(String).join(' · ')) + '</span>' + (s.lastVisit ? ' ' + chip('Visited ' + niceDate(s.lastVisit), 'good') : '') +
-      (s.caution ? ' ' + chip('Not ready or merged', 'warn') : '') + (s.notWilling ? ' ' + chip(WORDS.notWilling, 'bad') : '') + alertChips(s.alerts) +
-      ' <button class="btn sm" type="button" data-tb="' + s.id + '" data-for="' + esc(v.email) + '" style="margin-left:6px">Take back</button></div>';
-  }).join('') : '<span class="small">No schools yet.</span>');
+  h += '<h4>Schools</h4>' + schoolRows(v);
   h += '<h4>Private remarks <span class="small">(only coordinators and the office see these)</span></h4>' +
     (v.remarks.length ? v.remarks.map(function (r) {
       return '<div class="list-row">' + chip(r.kind, r.kind === 'Positive' ? 'good' : r.kind === 'Concern' ? 'bad' : '') + (r.recent ? chip('Recent', 'warn') : '') +
@@ -1425,9 +1420,9 @@ function personPanel(v) {
   }
   return h + '<div id="pmsg"></div>';
 }
-function wirePersonPanel() {
-  // "Take back" next to each school: tap twice, the school becomes free again
-  Array.prototype.forEach.call(document.querySelectorAll('#vlist [data-tb]'), function (b) {
+// "Take back" next to each school (Volunteers panel and Coordinators screen): tap twice, the school becomes free again.
+function wireTakeBack(root, redrawFn) {
+  Array.prototype.forEach.call(document.querySelectorAll(root + ' [data-tb]'), function (b) {
     b.addEventListener('click', function (ev) {
       ev.stopPropagation();
       if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Tap again to take back'; b.classList.add('danger'); return; }
@@ -1442,10 +1437,22 @@ function wirePersonPanel() {
           if (gone && gone.lastVisit) v.visited = Math.max(0, v.visited - 1);
         }
         delete APP.pages[b.dataset.tb]; APP.volsT = 0; warmSoon();
-        toast('School taken back. It is free again.'); drawVolunteers();
+        toast('School taken back. It is free again.'); redrawFn();
       });
     });
   });
+}
+// A person's schools, each with its "Take back" button.
+function schoolRows(v) {
+  return v.schoolList && v.schoolList.length ? v.schoolList.map(function (s, k) {
+    return '<div class="list-row"><button class="link" type="button" data-school="' + s.id + '">' + (k + 1) + '. ' + esc(s.name) + '</button>' +
+      ' <span class="small">' + esc([s.village, s.taluk].filter(String).join(' · ')) + '</span>' + (s.lastVisit ? ' ' + chip('Visited ' + niceDate(s.lastVisit), 'good') : '') +
+      (s.caution ? ' ' + chip('Not ready or merged', 'warn') : '') + (s.notWilling ? ' ' + chip(WORDS.notWilling, 'bad') : '') + alertChips(s.alerts) +
+      ' <button class="btn sm" type="button" data-tb="' + s.id + '" data-for="' + esc(v.email) + '" style="margin-left:6px">Take back</button></div>';
+  }).join('') : '<span class="small">No schools yet.</span>';
+}
+function wirePersonPanel() {
+  wireTakeBack('#vlist', drawVolunteers);
   var rs = document.getElementById('rsave');
   if (rs) rs.addEventListener('click', function () {
     var text = document.getElementById('rt').value.trim();
@@ -1904,17 +1911,21 @@ function screenCoordinators() {
     drawCoordinators();
   });
 }
+// Tap a coordinator: their volunteers. Tap a volunteer: their schools (each with "Take back")
+// and "Change coordinator". "Make volunteer again" asks to tap twice.
 function drawCoordinators() {
   var coords = APP.vols.filter(function (v) { return /^coord/i.test(v.role); });
   var others = APP.vols.filter(function (v) { return !/^coord/i.test(v.role) && /^active$/i.test(v.status); });
   var noCoord = APP.vols.filter(function (v) { return /^vol/i.test(v.role) && !v.coordinator; }).length;
-  var h = subTabs() + '<h2>Coordinators</h2><p class="small">' + noCoord + ' volunteer' + (noCoord === 1 ? ' has' : 's have') + ' no coordinator yet: give them in Admin → Volunteers (tick, then "Give to coordinator").</p>';
-  h += '<div class="tbl-wrap"><table><thead><tr><th>#</th><th>Coordinator</th><th>Status</th><th class="n">Volunteers</th><th class="n">Their schools</th><th class="n">Visited</th><th></th></tr></thead><tbody>';
+  var h = subTabs() + '<h2>Coordinators</h2><p class="small">' + noCoord + ' volunteer' + (noCoord === 1 ? ' has' : 's have') + ' no coordinator yet: give them in Admin → Volunteers (tick, then "Give to coordinator"). Tap a coordinator to see their volunteers.</p>';
+  h += '<div class="tbl-wrap" id="clist"><table><thead><tr><th>#</th><th>Coordinator</th><th>Status</th><th class="n">Volunteers</th><th class="n">Their schools</th><th class="n">Visited</th><th></th></tr></thead><tbody>';
   coords.forEach(function (c, i) {
     var mine = APP.vols.filter(function (v) { return v.coordinator === c.email; });
-    h += '<tr><td>' + (i + 1) + '</td><td><b>' + esc(c.name) + '</b><div class="small">' + esc(c.email) + '</div></td><td>' + chip(c.status, /^active$/i.test(c.status) ? 'good' : 'bad') + '</td>' +
+    var open = APP.openCoord === c.email;
+    h += '<tr class="click" data-coord="' + esc(c.email) + '"><td>' + (i + 1) + '</td><td><b>' + (open ? '▾ ' : '▸ ') + esc(c.name) + '</b><div class="small">' + esc(c.email) + '</div></td><td>' + chip(c.status, /^active$/i.test(c.status) ? 'good' : 'bad') + '</td>' +
       '<td class="n">' + mine.length + '</td><td class="n">' + mine.reduce(function (t, v) { return t + v.schools; }, 0) + '</td><td class="n">' + mine.reduce(function (t, v) { return t + v.visited; }, 0) + '</td>' +
       '<td><button class="btn sm" type="button" data-unmake="' + esc(c.email) + '">Make volunteer again</button></td></tr>';
+    if (open) h += '<tr><td colspan="7">' + coordPanel(c, mine) + '</td></tr>';
   });
   h += '</tbody></table></div>';
   h += '<h3 style="margin-top:18px">Make a person coordinator</h3><div class="bar"><div id="mpick" style="flex:1;min-width:240px"></div>' +
@@ -1933,11 +1944,52 @@ function drawCoordinators() {
   };
   document.getElementById('mgo').addEventListener('click', function () { if (!APP.makeCoord) { toast('Choose the person.'); return; } setRole(APP.makeCoord, 'Coordinator', this); });
   Array.prototype.forEach.call(document.querySelectorAll('[data-unmake]'), function (b) {
-    b.addEventListener('click', function () {
+    b.addEventListener('click', function (ev) {
+      ev.stopPropagation();
       if (b.dataset.sure !== '1') { b.dataset.sure = '1'; b.textContent = 'Tap again to confirm'; return; }
       setRole(b.dataset.unmake, 'Volunteer', b);
     });
   });
+  Array.prototype.forEach.call(document.querySelectorAll('#clist [data-coord]'), function (tr) {
+    tr.addEventListener('click', function (ev) {
+      if (ev.target.closest('button')) return;
+      APP.openCoord = APP.openCoord === tr.dataset.coord ? '' : tr.dataset.coord; APP.openCoordVol = ''; drawCoordinators();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#clist [data-cvol]'), function (b) {
+    b.addEventListener('click', function () { APP.openCoordVol = APP.openCoordVol === b.dataset.cvol ? '' : b.dataset.cvol; drawCoordinators(); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#clist [data-school]'), function (b) {
+    b.addEventListener('click', function () { openSchoolFrom(b.dataset.school); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#clist [data-chco]'), function (b) {
+    b.addEventListener('click', function () {
+      var email = b.dataset.chco, sel = document.querySelector('#clist select[data-chsel="' + email + '"]'), to = sel ? sel.value : '';
+      var v = APP.vols.filter(function (x) { return x.email === email; })[0];
+      if (!v || to === (v.coordinator || '')) { toast('Choose a different coordinator first.'); return; }
+      b.disabled = true; b.textContent = 'Saving…';
+      apiCall('savePeople', { emails: [email], set: { coordinator: to } }).then(function (r) {
+        if (!r.ok) { b.disabled = false; b.textContent = 'Change'; toast(r.error); return; }
+        var c = APP.vols.filter(function (x) { return x.email === to; })[0];
+        v.coordinator = to; v.coordinatorName = to ? (c ? c.name : to) : '';
+        APP.openCoordVol = ''; APP.volsT = 0;
+        toast(to ? 'Moved to ' + v.coordinatorName + '.' : 'Coordinator removed.'); drawCoordinators();
+      });
+    });
+  });
+  wireTakeBack('#clist', drawCoordinators);
+}
+function coordPanel(c, mine) {
+  if (!mine.length) return '<span class="small">No volunteers with ' + esc(c.name) + ' yet.</span>';
+  return '<h4 style="margin-top:0">Volunteers of ' + esc(c.name) + '</h4>' + mine.map(function (v, k) {
+    var open = APP.openCoordVol === v.email;
+    return '<div class="list-row"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between">' +
+      '<button class="link" type="button" data-cvol="' + esc(v.email) + '">' + (open ? '▾ ' : '▸ ') + (k + 1) + '. ' + esc(v.name) + '</button>' +
+      '<span class="small">' + esc(v.email) + ' · ' + v.schools + ' school' + (v.schools === 1 ? '' : 's') + ', ' + v.visited + ' visited</span>' +
+      '<span style="display:flex;gap:6px;align-items:center"><select data-chsel="' + esc(v.email) + '" aria-label="Coordinator"><option value="">No coordinator</option>' + coordOptions(v.coordinator) + '</select>' +
+      '<button class="btn sm" type="button" data-chco="' + esc(v.email) + '">Change</button></span></div>' +
+      (open ? '<div style="margin:6px 0 0 14px">' + schoolRows(v) + '</div>' : '') + '</div>';
+  }).join('');
 }
 /* ===== END P7.6 ===== */
 
