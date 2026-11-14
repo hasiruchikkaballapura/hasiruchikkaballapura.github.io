@@ -1,3 +1,4 @@
+// Deployed from GitHub (hasirushaale-adoption/backend). Do not edit in the Apps Script editor.
 /*
  * =====================================================================
  *  Code.gs  |  Hasiru Shaale adoption app: backend (Google Apps Script)
