@@ -44,7 +44,11 @@ jobs:
         run: |
           mkdir -p /tmp/live && cp .clasp.json /tmp/live/
           (cd /tmp/live && clasp pull && echo "Files in Apps Script:" && ls)
-          if diff -q Code.gs /tmp/live/Code.gs; then echo "SAME: GitHub Code.gs matches the live Apps Script code."; else echo "DIFFERENT: GitHub Code.gs is not the same as the live Apps Script code."; fi
+          # clasp saves the downloaded Code.gs as Code.js; compare ignoring line-ending differences
+          LIVE=/tmp/live/Code.js; [ -f /tmp/live/Code.gs ] && LIVE=/tmp/live/Code.gs
+          # ignore Windows line endings and a missing newline at the very end
+          sed -e 's/\r$//' -e '$a\' Code.gs > /tmp/a.gs; sed -e 's/\r$//' -e '$a\' "$LIVE" > /tmp/b.gs
+          if diff -q /tmp/a.gs /tmp/b.gs; then echo "SAME: GitHub Code.gs matches the live Apps Script code."; else echo "DIFFERENT: GitHub Code.gs is not the same as the live Apps Script code."; diff /tmp/a.gs /tmp/b.gs | head -40; fi
       - name: Send to Apps Script and make it live
         if: env.CLASPRC != '' && env.DEPLOYMENT_ID != '' && (github.event_name == 'push' || inputs.check_only == false)
         run: |
