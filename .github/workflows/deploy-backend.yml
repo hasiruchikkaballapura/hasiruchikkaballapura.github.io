@@ -46,7 +46,9 @@ jobs:
           (cd /tmp/live && clasp pull && echo "Files in Apps Script:" && ls)
           # clasp saves the downloaded Code.gs as Code.js; compare ignoring line-ending differences
           LIVE=/tmp/live/Code.js; [ -f /tmp/live/Code.gs ] && LIVE=/tmp/live/Code.gs
-          if diff -q --strip-trailing-cr Code.gs "$LIVE"; then echo "SAME: GitHub Code.gs matches the live Apps Script code."; else echo "DIFFERENT: GitHub Code.gs is not the same as the live Apps Script code."; diff --strip-trailing-cr Code.gs "$LIVE" | head -40; fi
+          # ignore Windows line endings and a missing newline at the very end
+          sed -e 's/\r$//' -e '$a\' Code.gs > /tmp/a.gs; sed -e 's/\r$//' -e '$a\' "$LIVE" > /tmp/b.gs
+          if diff -q /tmp/a.gs /tmp/b.gs; then echo "SAME: GitHub Code.gs matches the live Apps Script code."; else echo "DIFFERENT: GitHub Code.gs is not the same as the live Apps Script code."; diff /tmp/a.gs /tmp/b.gs | head -40; fi
       - name: Send to Apps Script and make it live
         if: env.CLASPRC != '' && env.DEPLOYMENT_ID != '' && (github.event_name == 'push' || inputs.check_only == false)
         run: |
